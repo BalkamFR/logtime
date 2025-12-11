@@ -1,0 +1,7 @@
+{
+  "name": "42 Dashboard Ultimate",
+  "description": "Logtime, Wallet et Amis.",
+  "uuid": "42-dashboard@papilaz",
+  "shell-version": ["46"],
+  "version": 2
+}

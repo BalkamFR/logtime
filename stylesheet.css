@@ -1,0 +1,75 @@
+.lgt-button-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 800;
+    color: #ffffff;
+}
+
+/* Le Panel (Menu déroulant) */
+.lgt-popup-menu {
+    background-color: rgba(18, 18, 24, 0.95);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 20px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.7);
+    margin-top: 10px;
+    min-width: 300px;
+    padding: 15px;
+}
+
+.lgt-header-row {
+    margin-bottom: 10px;
+    padding-bottom: 5px;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+
+.lgt-title {
+    font-size: 10px;
+    font-weight: 800;
+    color: #8b8b9b;
+}
+
+.lgt-main-time {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 24px;
+    font-weight: 700;
+    color: #ffffff;
+    text-align: center;
+    padding: 10px 0;
+}
+
+.lgt-stats-grid {
+    display: flex; /* Note: St utilise des LayoutManagers, le CSS display flex est limité */
+    padding: 5px 0;
+}
+
+.lgt-stat-box {
+    background-color: rgba(255,255,255,0.05);
+    border-radius: 10px;
+    padding: 10px;
+    margin: 5px;
+    text-align: center;
+}
+
+.lgt-stat-label {
+    font-size: 9px;
+    color: #8b8b9b;
+    font-weight: 600;
+}
+
+.lgt-stat-value {
+    font-size: 14px;
+    font-weight: 700;
+    color: #ffffff;
+}
+
+.lgt-danger { color: #ff4757; }
+.lgt-success { color: #2ed573; }
+.lgt-accent { color: #00babc; }
+
+.lgt-friend-row {
+    padding: 8px;
+    border-radius: 8px;
+    margin-top: 4px;
+}
+.lgt-friend-row:hover {
+    background-color: rgba(255,255,255,0.1);
+}
