@@ -25,6 +25,7 @@
 }
 
 .lgt-stats-grid { padding: 10px 0; }
+
 .lgt-stat-box {
     background-color: rgba(255,255,255,0.08);
     border-radius: 12px;
@@ -32,8 +33,10 @@
     margin: 6px;
     text-align: center;
 }
+
 .lgt-stat-label { font-size: 11px; color: #8b8b9b; font-weight: 600; text-transform: uppercase; }
 .lgt-stat-value { font-size: 16px; font-weight: 800; color: #ffffff; margin-top: 4px; }
+.lgt-danger { color: #ff4757; }
 
 .lgt-title {
     font-size: 12px;
@@ -51,12 +54,37 @@
     padding: 10px;
 }
 
-/* Note: Le style .lgt-friend-avatar est géré en JS pour le border-radius */
+/* LE CONTENEUR ROND */
 .lgt-friend-avatar {
+    width: 44px;
+    height: 44px;
+    border-radius: 99px; /* Force le rond */
     margin-right: 15px;
+    overflow: hidden; /* Coupe ce qui dépasse */
     background-color: #222;
 }
 
-.lgt-friend-name { font-weight: 800; color: #fff; font-size: 16px; }
-.lgt-friend-logtime { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #aaa; }
-.lgt-friend-status { font-family: 'JetBrains Mono', monospace; font-weight: bold; font-size: 14px; }
+/* L'IMAGE */
+.lgt-friend-avatar-img {
+    width: 44px;
+    height: 44px;
+    border-radius: 99px;
+}
+
+.lgt-friend-name {
+    font-weight: 800;
+    color: #fff;
+    font-size: 16px;
+}
+
+.lgt-friend-logtime {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    color: #aaa;
+}
+
+.lgt-friend-status {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: bold;
+    font-size: 14px;
+}

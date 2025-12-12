@@ -1,26 +1,36 @@
-const { St, GLib, Clutter, Soup, GObject } = imports.gi;
+const { St, GLib, Clutter, Soup, GObject, Gio } = imports.gi;
 const Main = imports.ui.main;
 const PanelMenu = imports.ui.panelMenu;
 const PopupMenu = imports.ui.popupMenu;
-const Me = imports.misc.extensionUtils.getCurrentExtension();
+const ExtensionUtils = imports.misc.extensionUtils;
+const Me = ExtensionUtils.getCurrentExtension();
 
 // --- CONFIGURATION ---
 const UID = "u-s4t2ud-f03601c98c248d266a0ff1ad9fa690660dcc1e4a73f3db5d5210d98f44123e26";
 const SECRET = "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";
-const ME = "papilaz"; // Ton login
+const ME = "papilaz";
 
-// Sur GNOME 42 (Ubuntu 22.04), Soup est souvent en v2.4 par défaut via imports.gi.
-// On adapte la session pour être compatible.
-const _httpSession = new Soup.SessionAsync();
-// Fake user agent pour éviter certains blocages
-_httpSession.user_agent = 'LogtimeExtension/1.0';
+// Initialisation Soup (Web Client)
+let _httpSession;
+try {
+    _httpSession = new Soup.SessionAsync();
+    _httpSession.user_agent = 'LogtimeExtension/3.5';
+} catch (e) {
+    _httpSession = new Soup.Session();
+}
 
 const DashboardIndicator = GObject.registerClass(
 class DashboardIndicator extends PanelMenu.Button {
     _init() {
         super._init(0.0, "42 Dashboard", false);
+        this._settings = ExtensionUtils.getSettings('org.gnome.shell.extensions.logtime');
+        
+        // Rafraîchir quand on change la liste d'amis
+        this._settingsChangedId = this._settings.connect('changed::friends-list', () => {
+            this._refresh();
+        });
 
-        // Label barre du haut
+        // Label Barre du haut
         this.buttonLabel = new St.Label({
             text: "...",
             y_align: Clutter.ActorAlign.CENTER,
@@ -28,12 +38,10 @@ class DashboardIndicator extends PanelMenu.Button {
         });
         this.add_child(this.buttonLabel);
 
-        // Menu
-        // Sur GNOME 42, on accède souvent à 'this.menu.box' différemment, 
-        // mais essayons de garder la structure standard.
+        // --- MENU ---
         this.menu.box.style_class = 'lgt-popup-menu';
 
-        // 1. Timer
+        // 1. Timer (Gros)
         this.timeDisplay = new St.Label({ text: "chargement...", style_class: 'lgt-main-time' });
         this.menu.box.add_child(this.timeDisplay);
 
@@ -45,9 +53,16 @@ class DashboardIndicator extends PanelMenu.Button {
         this.menu.box.add_child(statsBox);
 
         this.menu.box.add_child(new PopupMenu.PopupSeparatorMenuItem());
+        
+        // 3. Section Amis
+        this.menu.box.add_child(new St.Label({ text: "FRIENDS STATUS", style_class: 'lgt-title' }));
+        this.friendsBox = new St.BoxLayout({ vertical: true });
+        this.menu.box.add_child(this.friendsBox);
 
-        // Refresh loop
+        // Démarrage
         this._refresh();
+        
+        // Auto-refresh toutes les 2 minutes
         this._timeout = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, 120, () => {
             this._refresh();
             return GLib.SOURCE_CONTINUE;
@@ -63,37 +78,38 @@ class DashboardIndicator extends PanelMenu.Button {
         return valLabel;
     }
 
+    // Fonction d'attente (Pause)
+    _wait(ms) {
+        return new Promise(resolve => {
+            GLib.timeout_add(GLib.PRIORITY_DEFAULT, ms, () => {
+                resolve();
+                return GLib.SOURCE_REMOVE;
+            });
+        });
+    }
+
     async _getToken() {
         if (this.token && this.tokenExpire > (Date.now()/1000)) return this.token;
 
-        // Soup 2.4 syntax
         let msg = Soup.Message.new('POST', 'https://api.intra.42.fr/oauth/token');
-        
-        let bodyObj = {
-            grant_type: 'client_credentials',
-            client_id: UID,
-            client_secret: SECRET
-        };
+        let bodyObj = { grant_type: 'client_credentials', client_id: UID, client_secret: SECRET };
         let bodyStr = JSON.stringify(bodyObj);
         
-        // Soup 2.4 set_request (différent de Soup 3)
-        msg.set_request('application/json', 2, bodyStr, bodyStr.length);
+        if (msg.set_request) msg.set_request('application/json', 2, bodyStr, bodyStr.length);
+        else {
+            msg.request_headers.append('Content-Type', 'application/json');
+            msg.set_body_data(GLib.Bytes.new(bodyStr));
+        }
 
         let response = await this._send_async(msg);
         if (!response) return null;
 
         try {
             let data = JSON.parse(response);
-            if (data.error) throw new Error(data.error);
-
             this.token = data.access_token;
             this.tokenExpire = (Date.now()/1000) + data.expires_in;
             return this.token;
-        } catch (e) {
-            log("LogtimeAuthError: " + e);
-            this.buttonLabel.set_text("ERR AUTH");
-            return null;
-        }
+        } catch (e) { return null; }
     }
 
     async _refresh() {
@@ -104,99 +120,195 @@ class DashboardIndicator extends PanelMenu.Button {
         let start = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
         let end = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString();
         
-        // --- 1. LOGTIME ---
-        this._fetchJson(`https://api.intra.42.fr/v2/users/${ME}/locations?range[begin_at]=${start},${end}&per_page=100`, token, (d) => {
-            if (Array.isArray(d)) {
-                let ms = d.reduce((a, l) => a + ((l.end_at ? new Date(l.end_at) : new Date()) - new Date(l.begin_at)), 0);
-                let h = Math.floor(ms/3600000);
-                let m = Math.floor((ms%3600000)/60000);
-                let txt = `${h}h ${m}m`;
-                
-                this.buttonLabel.set_text(txt);
-                this.timeDisplay.set_text(txt);
-            } else {
-                this.buttonLabel.set_text("ERR API");
+        // --- Mes Infos (Prioritaire) ---
+        let myLocs = await this._fetchJsonPromise(`https://api.intra.42.fr/v2/users/${ME}/locations?range[begin_at]=${start},${end}&per_page=100`, token);
+        if (Array.isArray(myLocs)) {
+            let txt = this._calculateTime(myLocs);
+            this.buttonLabel.set_text(txt);
+            this.timeDisplay.set_text(txt);
+        }
+
+        let myStats = await this._fetchJsonPromise(`https://api.intra.42.fr/v2/users/${ME}`, token);
+        if (myStats && myStats.wallet !== undefined) {
+            this.walletLbl.set_text(`${myStats.wallet} ₳`);
+            let c = myStats.cursus_users.find(x => x.cursus.slug === "42cursus") || myStats.cursus_users[0];
+            if (c) this.lvlLbl.set_text(`${Number(c.level).toFixed(2)}`);
+            if (c && c.blackholed_at) {
+                let diff = Math.round((new Date(c.blackholed_at) - new Date()) / 86400000);
+                this.bhLbl.set_text(`${diff} j`);
             }
+        }
+
+        // --- Infos Amis ---
+        await this._updateFriendsList(token);
+    }
+
+    async _updateFriendsList(token) {
+        this.friendsBox.destroy_all_children();
+        let friends = this._settings.get_strv('friends-list');
+        
+        if (friends.length === 0) {
+            this.friendsBox.add_child(new St.Label({ text: "Ajoute tes amis...", style_class: 'lgt-stat-label' }));
+            return;
+        }
+
+        let now = new Date();
+        let start = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+        let end = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString();
+
+        // On va stocker les lignes créées ici pour les trier à la fin
+        let loadedRows = [];
+
+        // On boucle sur les amis UN PAR UN avec "await"
+        for (const login of friends) {
+            // Création visuelle de la ligne
+            let row = new St.BoxLayout({ style_class: 'lgt-friend-row', vertical: false });
+            
+            // Avatar
+            let iconBin = new St.Bin({ style_class: 'lgt-friend-avatar', y_align: Clutter.ActorAlign.CENTER });
+            iconBin.set_child(new St.Icon({ icon_name: 'avatar-default-symbolic', icon_size: 44 }));
+            row.add_child(iconBin);
+
+            // Infos
+            let infoBox = new St.BoxLayout({ vertical: true, style_class: 'lgt-friend-info', x_expand: true, y_align: Clutter.ActorAlign.CENTER });
+            let nameLbl = new St.Label({ text: login, style_class: 'lgt-friend-name' });
+            let timeLbl = new St.Label({ text: "...", style_class: 'lgt-friend-logtime' });
+            infoBox.add_child(nameLbl);
+            infoBox.add_child(timeLbl);
+            row.add_child(infoBox);
+
+            // Status
+            let statusLbl = new St.Label({ text: "⚫", style_class: 'lgt-friend-status', y_align: Clutter.ActorAlign.CENTER });
+            row.add_child(statusLbl);
+            
+            this.friendsBox.add_child(row);
+
+            // --- REQUETES API avec PAUSES ---
+            let isActive = false; // Par défaut off
+
+            // 1. Image
+            let user = await this._fetchJsonPromise(`https://api.intra.42.fr/v2/users/${login}`, token);
+            if (user && user.image?.versions?.small) {
+                this._downloadAndSetAvatar(user.image.versions.small, login, iconBin);
+            }
+            
+            // Petite pause pour respirer (API limit)
+            await this._wait(600); 
+
+            // 2. Logtime & Cluster
+            let locs = await this._fetchJsonPromise(`https://api.intra.42.fr/v2/users/${login}/locations?range[begin_at]=${start},${end}&per_page=100`, token);
+            
+            if (Array.isArray(locs)) {
+                timeLbl.set_text(this._calculateTime(locs));
+                isActive = locs.length > 0 && locs[0].end_at === null;
+                
+                if (isActive) {
+                    statusLbl.set_text(`🟢 ${locs[0].host}`);
+                    statusLbl.set_style("color: #2ed573; font-weight: bold;");
+                } else {
+                    statusLbl.set_text("🔴 Off");
+                    statusLbl.set_style("color: #ff4757;");
+                }
+            } else {
+                timeLbl.set_text("Err API");
+            }
+
+            // On stocke la ligne et son état pour le tri final
+            loadedRows.push({ widget: row, isOnline: isActive });
+
+            // Pause finale avant le prochain ami
+            await this._wait(600);
+        }
+
+        // --- TRI FINAL UNE FOIS TOUT CHARGÉ ---
+        // On trie le tableau : Online (true) en premier
+        loadedRows.sort((a, b) => {
+            if (a.isOnline === b.isOnline) return 0;
+            return a.isOnline ? -1 : 1;
         });
 
-        // --- 2. STATS ---
-        this._fetchJson(`https://api.intra.42.fr/v2/users/${ME}`, token, (d) => {
-            if (!d || d.error) return;
-            this.walletLbl.set_text(`${d.wallet} ₳`);
-            
-            let c = d.cursus_users.find(x => x.cursus.slug === "42cursus") || d.cursus_users[0];
-            if (c) {
-                this.lvlLbl.set_text(`${Number(c.level).toFixed(2)}`);
-                if (c.blackholed_at) {
-                    let target = new Date(c.blackholed_at);
-                    let diff = Math.round((target - new Date()) / 86400000);
-                    this.bhLbl.set_text(`${diff} jours`);
-                    if(diff < 30) this.bhLbl.add_style_class_name('lgt-danger');
-                    else this.bhLbl.remove_style_class_name('lgt-danger');
-                } else {
-                    this.bhLbl.set_text("Safe");
-                }
+        // On réorganise les enfants dans la box selon l'ordre trié
+        loadedRows.forEach((item, index) => {
+            this.friendsBox.set_child_at_index(item.widget, index);
+        });
+    }
+
+    _calculateTime(data) {
+        let ms = data.reduce((a, l) => a + ((l.end_at ? new Date(l.end_at) : new Date()) - new Date(l.begin_at)), 0);
+        let h = Math.floor(ms/3600000);
+        let m = Math.floor((ms%3600000)/60000);
+        return `${h}h ${m}m`;
+    }
+
+    _downloadAndSetAvatar(url, login, iconBin) {
+        let tmpPath = GLib.get_tmp_dir() + `/42_avatar_${login}.jpg`;
+        let file = Gio.File.new_for_path(tmpPath);
+        
+        if (file.query_exists(null)) {
+            let gicon = new Gio.FileIcon({ file: file });
+            iconBin.set_child(new St.Icon({ gicon: gicon, icon_size: 44, style_class: 'lgt-friend-avatar' }));
+            return;
+        }
+
+        let msg = Soup.Message.new('GET', url);
+        _httpSession.queue_message(msg, (s, m) => {
+            if (m.status_code === 200) {
+                try {
+                    let contents = m.response_body.flatten().get_data();
+                    GLib.file_set_contents(tmpPath, contents);
+                    let gicon = new Gio.FileIcon({ file: file });
+                    iconBin.set_child(new St.Icon({ gicon: gicon, icon_size: 44, style_class: 'lgt-friend-avatar' }));
+                } catch(e) {}
             }
+        });
+    }
+
+    // Helper pour fetcher proprement avec await
+    _fetchJsonPromise(url, token) {
+        return new Promise(resolve => {
+            let msg = Soup.Message.new('GET', url);
+            msg.request_headers.append('Authorization', `Bearer ${token}`);
+            
+            if (_httpSession.queue_message) {
+                _httpSession.queue_message(msg, (s, m) => {
+                    if (m.status_code === 200) {
+                        try { resolve(JSON.parse(m.response_body.data)); } 
+                        catch(e) { resolve(null); }
+                    } else {
+                        log(`API Error ${m.status_code} for ${url}`);
+                        resolve(null);
+                    }
+                });
+            } else resolve(null);
         });
     }
 
     _send_async(msg) {
-        return new Promise((resolve, reject) => {
-            _httpSession.queue_message(msg, (session, message) => {
-                if (message.status_code !== 200 && message.status_code !== 201) {
-                    log("API Error: " + message.status_code);
-                    resolve(null);
-                } else {
-                    if (message.response_body && message.response_body.data) {
-                        resolve(message.response_body.data);
-                    } else {
-                        resolve(null);
-                    }
-                }
-            });
-        });
-    }
-
-    _fetchJson(url, token, callback) {
-        let msg = Soup.Message.new('GET', url);
-        msg.request_headers.append('Authorization', `Bearer ${token}`);
-        
-        _httpSession.queue_message(msg, (session, message) => {
-             if (message.status_code === 200) {
-                 try {
-                    let data = message.response_body.data;
-                    callback(JSON.parse(data));
-                 } catch(e) { log(e); }
-             }
+        return new Promise((resolve) => {
+            if (_httpSession.queue_message) {
+                _httpSession.queue_message(msg, (s, m) => {
+                    if (m.response_body && m.response_body.data) resolve(m.response_body.data);
+                    else resolve(null);
+                });
+            } else resolve(null);
         });
     }
     
     destroy() {
-        if (this._timeout) {
-            GLib.source_remove(this._timeout);
-            this._timeout = null;
-        }
+        if (this._timeout) GLib.source_remove(this._timeout);
+        if (this._settingsChangedId) this._settings.disconnect(this._settingsChangedId);
         super.destroy();
     }
 });
 
-// --- STANDARD GNOME 42 (LEGACY) ---
 let _indicator;
-
-function init() {
-    return new Extension();
-}
-
+function init() { return new Extension(); }
 class Extension {
     enable() {
         _indicator = new DashboardIndicator();
         Main.panel.addToStatusArea('logtime-indicator', _indicator);
     }
-
     disable() {
-        if (_indicator) {
-            _indicator.destroy();
-            _indicator = null;
-        }
+        if (_indicator) { _indicator.destroy(); _indicator = null; }
     }
 }
