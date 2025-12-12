@@ -1,9 +1,28 @@
+.lgt-top-box {
+    spacing: 0px; /* On gère l'espace via les margins des éléments */
+}
+
 .lgt-button-label {
     font-family: 'JetBrains Mono', monospace;
     font-weight: 800;
     font-size: 15px;
     color: #ffffff;
-    margin: 0 8px;
+    margin-left: 8px; /* Espace entre le badge et le texte */
+}
+
+/* NOUVEAU STYLE DU BADGE (PLUS GROS et VERT) */
+.lgt-online-badge {
+    background-color: #2ed573;
+    color: #000000; /* Noir sur fond vert */
+    border-radius: 99px;
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 900;
+    font-size: 14px; /* Plus gros */
+    padding: 2px 8px;
+    min-width: 18px;
+    text-align: center;
+    margin-right: 2px;
+    box-shadow: 0 0 10px rgba(46, 213, 115, 0.5); /* Effet lumineux */
 }
 
 .lgt-popup-menu {
@@ -51,25 +70,8 @@
     padding: 10px;
 }
 
-/* AVATARS RONDS - Solution avec StButton */
 .lgt-friend-avatar {
     margin-right: 15px;
-    border-radius: 22px;
-    background-color: #222;
-    min-width: 44px;
-    min-height: 44px;
-}
-
-.lgt-friend-avatar:hover {
-    background-color: #222;
-}
-
-.lgt-friend-avatar:active {
-    background-color: #222;
-}
-
-.lgt-friend-avatar StIcon {
-    border-radius: 22px;
 }
 
 .lgt-friend-name { font-weight: 800; color: #fff; font-size: 16px; }

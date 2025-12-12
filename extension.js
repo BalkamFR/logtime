@@ -10,11 +10,10 @@ const UID = "u-s4t2ud-f03601c98c248d266a0ff1ad9fa690660dcc1e4a73f3db5d5210d98f44
 const SECRET = "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";
 const ME = "papilaz";
 
-// Initialisation Soup (Web Client)
 let _httpSession;
 try {
     _httpSession = new Soup.SessionAsync();
-    _httpSession.user_agent = 'LogtimeExtension/3.5';
+    _httpSession.user_agent = 'LogtimeExtension/5.0';
 } catch (e) {
     _httpSession = new Soup.Session();
 }
@@ -25,17 +24,28 @@ class DashboardIndicator extends PanelMenu.Button {
         super._init(0.0, "42 Dashboard", false);
         this._settings = ExtensionUtils.getSettings('org.gnome.shell.extensions.logtime');
         
-        // Rafraîchir quand on change la liste d'amis
-        this._settingsChangedId = this._settings.connect('changed::friends-list', () => {
-            this._refresh();
-        });
+        this._currentLogtimeMs = 0;
 
-        // Label Barre du haut
+        // Listeners
+        this._settings.connect('changed::friends-list', () => this._refresh());
+        this._settings.connect('changed::gift-days', () => this._updateTimeLabel());
+
+        // --- BARRE DU HAUT ---
         let topBox = new St.BoxLayout({ 
             y_align: Clutter.ActorAlign.CENTER,
             style_class: 'lgt-top-box'
         });
         
+        // 1. Badge Amis
+        this.onlineBadge = new St.Label({
+            text: "0",
+            y_align: Clutter.ActorAlign.CENTER,
+            style_class: 'lgt-online-badge'
+        });
+        this.onlineBadge.hide();
+        topBox.add_child(this.onlineBadge);
+
+        // 2. Label Logtime
         this.buttonLabel = new St.Label({
             text: "...",
             y_align: Clutter.ActorAlign.CENTER,
@@ -43,41 +53,30 @@ class DashboardIndicator extends PanelMenu.Button {
         });
         topBox.add_child(this.buttonLabel);
         
-        // Badge nombre d'amis en ligne
-        this.onlineBadge = new St.Label({
-            text: "🟢 0",
-            y_align: Clutter.ActorAlign.CENTER,
-            style_class: 'lgt-online-badge'
-        });
-        topBox.add_child(this.onlineBadge);
-        
         this.add_child(topBox);
 
         // --- MENU ---
         this.menu.box.style_class = 'lgt-popup-menu';
 
-        // 1. Timer (Gros)
         this.timeDisplay = new St.Label({ text: "chargement...", style_class: 'lgt-main-time' });
         this.menu.box.add_child(this.timeDisplay);
 
-        // 2. Stats
         let statsBox = new St.BoxLayout({ vertical: false, style_class: 'lgt-stats-grid' });
+        
+        // STATS : Wallet, Evaluations, Level
         this.walletLbl = this._createStatBox(statsBox, "Wallet", "-");
-        this.bhLbl = this._createStatBox(statsBox, "Blackhole", "-");
+        this.evalLbl = this._createStatBox(statsBox, "Ev.P", "-");
         this.lvlLbl = this._createStatBox(statsBox, "Level", "-");
+        
         this.menu.box.add_child(statsBox);
 
         this.menu.box.add_child(new PopupMenu.PopupSeparatorMenuItem());
         
-        // 3. Section Amis
         this.menu.box.add_child(new St.Label({ text: "FRIENDS STATUS", style_class: 'lgt-title' }));
         this.friendsBox = new St.BoxLayout({ vertical: true });
         this.menu.box.add_child(this.friendsBox);
 
-        // Démarrage
         this._refresh();
-        
-        // Auto-refresh toutes les 2 minutes
         this._timeout = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, 120, () => {
             this._refresh();
             return GLib.SOURCE_CONTINUE;
@@ -93,32 +92,25 @@ class DashboardIndicator extends PanelMenu.Button {
         return valLabel;
     }
 
-    // Fonction d'attente (Pause)
     _wait(ms) {
-        return new Promise(resolve => {
-            GLib.timeout_add(GLib.PRIORITY_DEFAULT, ms, () => {
-                resolve();
-                return GLib.SOURCE_REMOVE;
-            });
-        });
+        return new Promise(resolve => GLib.timeout_add(GLib.PRIORITY_DEFAULT, ms, () => {
+            resolve();
+            return GLib.SOURCE_REMOVE;
+        }));
     }
 
     async _getToken() {
         if (this.token && this.tokenExpire > (Date.now()/1000)) return this.token;
-
         let msg = Soup.Message.new('POST', 'https://api.intra.42.fr/oauth/token');
         let bodyObj = { grant_type: 'client_credentials', client_id: UID, client_secret: SECRET };
         let bodyStr = JSON.stringify(bodyObj);
-        
         if (msg.set_request) msg.set_request('application/json', 2, bodyStr, bodyStr.length);
         else {
             msg.request_headers.append('Content-Type', 'application/json');
             msg.set_body_data(GLib.Bytes.new(bodyStr));
         }
-
         let response = await this._send_async(msg);
         if (!response) return null;
-
         try {
             let data = JSON.parse(response);
             this.token = data.access_token;
@@ -135,27 +127,50 @@ class DashboardIndicator extends PanelMenu.Button {
         let start = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
         let end = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString();
         
-        // --- Mes Infos (Prioritaire) ---
+        // MOI (Logtime)
         let myLocs = await this._fetchJsonPromise(`https://api.intra.42.fr/v2/users/${ME}/locations?range[begin_at]=${start},${end}&per_page=100`, token);
         if (Array.isArray(myLocs)) {
-            let txt = this._calculateTime(myLocs);
-            this.buttonLabel.set_text(txt);
-            this.timeDisplay.set_text(txt);
+            this._currentLogtimeMs = myLocs.reduce((a, l) => a + ((l.end_at ? new Date(l.end_at) : new Date()) - new Date(l.begin_at)), 0);
+            this._updateTimeLabel();
         }
 
+        // MOI (Stats)
         let myStats = await this._fetchJsonPromise(`https://api.intra.42.fr/v2/users/${ME}`, token);
-        if (myStats && myStats.wallet !== undefined) {
-            this.walletLbl.set_text(`${myStats.wallet} ₳`);
+        if (myStats) {
+            // Wallet
+            if (myStats.wallet !== undefined) {
+                this.walletLbl.set_text(`${myStats.wallet} ₳`);
+            }
+            
+            // Correction Points (Evaluations) - NOUVEAU
+            if (myStats.correction_point !== undefined) {
+                this.evalLbl.set_text(`${myStats.correction_point}`);
+            }
+
+            // Level
             let c = myStats.cursus_users.find(x => x.cursus.slug === "42cursus") || myStats.cursus_users[0];
-            if (c) this.lvlLbl.set_text(`${Number(c.level).toFixed(2)}`);
-            if (c && c.blackholed_at) {
-                let diff = Math.round((new Date(c.blackholed_at) - new Date()) / 86400000);
-                this.bhLbl.set_text(`${diff} j`);
+            if (c) {
+                this.lvlLbl.set_text(`${Number(c.level).toFixed(2)}`);
             }
         }
 
-        // --- Infos Amis ---
+        // AMIS
         await this._updateFriendsList(token);
+    }
+
+    _updateTimeLabel() {
+        if (this._currentLogtimeMs === 0) return;
+
+        let h = Math.floor(this._currentLogtimeMs/3600000);
+        let m = Math.floor((this._currentLogtimeMs%3600000)/60000);
+        
+        let giftDays = this._settings.get_int('gift-days');
+        let target = Math.max(0, 154 - (giftDays * 7));
+
+        let txt = `${h}h ${m}m / ${target}h`;
+        
+        this.buttonLabel.set_text(txt);
+        this.timeDisplay.set_text(txt);
     }
 
     async _updateFriendsList(token) {
@@ -164,40 +179,22 @@ class DashboardIndicator extends PanelMenu.Button {
         
         if (friends.length === 0) {
             this.friendsBox.add_child(new St.Label({ text: "Ajoute tes amis...", style_class: 'lgt-stat-label' }));
-            this.onlineBadge.set_text("🟢 0");
+            this.onlineBadge.hide();
             return;
         }
 
         let now = new Date();
         let start = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
         let end = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString();
-
-        // On va stocker les lignes créées ici pour les trier à la fin
         let loadedRows = [];
         let onlineCount = 0;
 
-        // On boucle sur les amis UN PAR UN avec "await"
         for (const login of friends) {
-            // Création visuelle de la ligne
             let row = new St.BoxLayout({ style_class: 'lgt-friend-row', vertical: false });
-            
-            // Avatar - Utilisation de Clutter.Actor pour masque circulaire
-            let iconBin = new St.Bin({ 
-                style_class: 'lgt-friend-avatar',
-                y_align: Clutter.ActorAlign.CENTER,
-                width: 44,
-                height: 44
-            });
-            
-            let defaultIcon = new St.Icon({ 
-                icon_name: 'avatar-default-symbolic', 
-                icon_size: 44
-            });
-            iconBin.set_child(defaultIcon);
-            
+            let iconBin = new St.Bin({ style_class: 'lgt-friend-avatar', y_align: Clutter.ActorAlign.CENTER, width: 44, height: 44 });
+            iconBin.set_child(new St.Icon({ icon_name: 'avatar-default-symbolic', icon_size: 44 }));
             row.add_child(iconBin);
 
-            // Infos
             let infoBox = new St.BoxLayout({ vertical: true, style_class: 'lgt-friend-info', x_expand: true, y_align: Clutter.ActorAlign.CENTER });
             let nameLbl = new St.Label({ text: login, style_class: 'lgt-friend-name' });
             let timeLbl = new St.Label({ text: "...", style_class: 'lgt-friend-logtime' });
@@ -205,31 +202,25 @@ class DashboardIndicator extends PanelMenu.Button {
             infoBox.add_child(timeLbl);
             row.add_child(infoBox);
 
-            // Status
             let statusLbl = new St.Label({ text: "⚫", style_class: 'lgt-friend-status', y_align: Clutter.ActorAlign.CENTER });
             row.add_child(statusLbl);
             
             this.friendsBox.add_child(row);
 
-            // --- REQUETES API avec PAUSES ---
-            let isActive = false; // Par défaut off
-
-            // 1. Image
+            let isActive = false;
             let user = await this._fetchJsonPromise(`https://api.intra.42.fr/v2/users/${login}`, token);
-            if (user && user.image?.versions?.small) {
-                this._downloadAndSetAvatar(user.image.versions.small, login, iconBin);
-            }
+            if (user && user.image?.versions?.small) this._downloadAndSetAvatar(user.image.versions.small, login, iconBin);
             
-            // Petite pause pour respirer (API limit)
             await this._wait(600); 
 
-            // 2. Logtime & Cluster
             let locs = await this._fetchJsonPromise(`https://api.intra.42.fr/v2/users/${login}/locations?range[begin_at]=${start},${end}&per_page=100`, token);
-            
             if (Array.isArray(locs)) {
-                timeLbl.set_text(this._calculateTime(locs));
+                let ams = locs.reduce((a, l) => a + ((l.end_at ? new Date(l.end_at) : new Date()) - new Date(l.begin_at)), 0);
+                let ah = Math.floor(ams/3600000);
+                let am = Math.floor((ams%3600000)/60000);
+                timeLbl.set_text(`${ah}h ${am}m`);
+
                 isActive = locs.length > 0 && locs[0].end_at === null;
-                
                 if (isActive) {
                     onlineCount++;
                     statusLbl.set_text(`🟢 ${locs[0].host}`);
@@ -242,34 +233,25 @@ class DashboardIndicator extends PanelMenu.Button {
                 timeLbl.set_text("Err API");
             }
 
-            // On stocke la ligne et son état pour le tri final
             loadedRows.push({ widget: row, isOnline: isActive });
-
-            // Pause finale avant le prochain ami
             await this._wait(600);
         }
 
-        // Mettre à jour le badge en ligne
-        this.onlineBadge.set_text(`🟢 ${onlineCount}`);
+        if (onlineCount > 0) {
+            this.onlineBadge.set_text(`${onlineCount}`);
+            this.onlineBadge.show();
+        } else {
+            this.onlineBadge.hide();
+        }
 
-        // --- TRI FINAL UNE FOIS TOUT CHARGÉ ---
-        // On trie le tableau : Online (true) en premier
         loadedRows.sort((a, b) => {
             if (a.isOnline === b.isOnline) return 0;
             return a.isOnline ? -1 : 1;
         });
 
-        // On réorganise les enfants dans la box selon l'ordre trié
         loadedRows.forEach((item, index) => {
             this.friendsBox.set_child_at_index(item.widget, index);
         });
-    }
-
-    _calculateTime(data) {
-        let ms = data.reduce((a, l) => a + ((l.end_at ? new Date(l.end_at) : new Date()) - new Date(l.begin_at)), 0);
-        let h = Math.floor(ms/3600000);
-        let m = Math.floor((ms%3600000)/60000);
-        return `${h}h ${m}m`;
     }
 
     _downloadAndSetAvatar(url, login, iconBin) {
@@ -290,15 +272,10 @@ class DashboardIndicator extends PanelMenu.Button {
                 try {
                     let contents = m.response_body.flatten().get_data();
                     GLib.file_set_contents(tmpPath, contents);
-                    
-                    // Créer une version ronde de l'image avec Cairo
                     this._createRoundImage(tmpPath, tmpRoundPath);
-                    
                     let gicon = new Gio.FileIcon({ file: roundFile });
                     iconBin.set_child(new St.Icon({ gicon: gicon, icon_size: 44 }));
-                } catch(e) {
-                    log(`Error: ${e}`);
-                }
+                } catch(e) { log(e); }
             }
         });
     }
@@ -306,15 +283,10 @@ class DashboardIndicator extends PanelMenu.Button {
     _createRoundImage(inputPath, outputPath) {
         const Cairo = imports.cairo;
         const Gdk = imports.gi.Gdk;
-        
         try {
-            // Charger l'image source à la taille exacte
             let pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_scale(inputPath, 44, 44, false);
-            
-            // Si l'image n'est pas carrée, on la recadre au centre
             let width = pixbuf.get_width();
             let height = pixbuf.get_height();
-            
             if (width != height) {
                 let size = Math.min(width, height);
                 let x = (width - size) / 2;
@@ -322,46 +294,29 @@ class DashboardIndicator extends PanelMenu.Button {
                 pixbuf = GdkPixbuf.Pixbuf.new_subpixbuf(pixbuf, x, y, size, size);
                 pixbuf = pixbuf.scale_simple(44, 44, GdkPixbuf.InterpType.BILINEAR);
             }
-            
-            // Créer une surface Cairo
             let surface = new Cairo.ImageSurface(Cairo.Format.ARGB32, 44, 44);
             let cr = new Cairo.Context(surface);
-            
-            // Fond transparent
             cr.setOperator(Cairo.Operator.CLEAR);
             cr.paint();
             cr.setOperator(Cairo.Operator.OVER);
-            
-            // Créer un cercle de clipping
             cr.arc(22, 22, 22, 0, 2 * Math.PI);
             cr.clip();
-            
-            // Dessiner l'image dans le cercle (remplir tout le cercle)
             Gdk.cairo_set_source_pixbuf(cr, pixbuf, 0, 0);
             cr.paint();
-            
-            // Sauvegarder en PNG
             surface.writeToPNG(outputPath);
-        } catch(e) {
-            log(`Error creating round image: ${e}`);
-        }
+        } catch(e) { log(e); }
     }
 
-    // Helper pour fetcher proprement avec await
     _fetchJsonPromise(url, token) {
         return new Promise(resolve => {
             let msg = Soup.Message.new('GET', url);
             msg.request_headers.append('Authorization', `Bearer ${token}`);
-            
             if (_httpSession.queue_message) {
                 _httpSession.queue_message(msg, (s, m) => {
                     if (m.status_code === 200) {
                         try { resolve(JSON.parse(m.response_body.data)); } 
                         catch(e) { resolve(null); }
-                    } else {
-                        log(`API Error ${m.status_code} for ${url}`);
-                        resolve(null);
-                    }
+                    } else resolve(null);
                 });
             } else resolve(null);
         });
@@ -388,11 +343,6 @@ class DashboardIndicator extends PanelMenu.Button {
 let _indicator;
 function init() { return new Extension(); }
 class Extension {
-    enable() {
-        _indicator = new DashboardIndicator();
-        Main.panel.addToStatusArea('logtime-indicator', _indicator);
-    }
-    disable() {
-        if (_indicator) { _indicator.destroy(); _indicator = null; }
-    }
+    enable() { _indicator = new DashboardIndicator(); Main.panel.addToStatusArea('logtime-indicator', _indicator); }
+    disable() { if (_indicator) { _indicator.destroy(); _indicator = null; } }
 }
