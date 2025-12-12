@@ -1,28 +1,25 @@
-.lgt-top-box {
-    spacing: 0px; /* On gère l'espace via les margins des éléments */
-}
+.lgt-top-box { spacing: 0px; }
 
 .lgt-button-label {
     font-family: 'JetBrains Mono', monospace;
     font-weight: 800;
     font-size: 15px;
     color: #ffffff;
-    margin-left: 8px; /* Espace entre le badge et le texte */
+    margin-left: 8px;
 }
 
-/* NOUVEAU STYLE DU BADGE (PLUS GROS et VERT) */
 .lgt-online-badge {
     background-color: #2ed573;
-    color: #000000; /* Noir sur fond vert */
+    color: #000000;
     border-radius: 99px;
     font-family: 'JetBrains Mono', monospace;
     font-weight: 900;
-    font-size: 14px; /* Plus gros */
+    font-size: 14px;
     padding: 2px 8px;
     min-width: 18px;
     text-align: center;
     margin-right: 2px;
-    box-shadow: 0 0 10px rgba(46, 213, 115, 0.5); /* Effet lumineux */
+    box-shadow: 0 0 10px rgba(46, 213, 115, 0.5);
 }
 
 .lgt-popup-menu {
@@ -54,26 +51,60 @@
 .lgt-stat-label { font-size: 11px; color: #8b8b9b; font-weight: 600; text-transform: uppercase; }
 .lgt-stat-value { font-size: 16px; font-weight: 800; color: #ffffff; margin-top: 4px; }
 
+/* --- ACTION ROW (TITRE + BOUTONS) --- */
+.lgt-action-row {
+    margin: 10px 0 5px 0;
+    padding-bottom: 5px;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+
 .lgt-title {
     font-size: 12px;
     font-weight: 900;
     color: #666;
-    margin: 15px 0 8px 5px;
     letter-spacing: 1px;
+    margin-left: 5px;
+}
+
+/* BOUTONS D'ACTION (Refresh / Settings) */
+.lgt-icon-btn {
+    padding: 4px 8px;
+    border-radius: 8px;
+    margin-left: 5px;
+}
+.lgt-icon-btn:hover {
+    background-color: rgba(255,255,255,0.1);
+}
+.lgt-icon-btn:active {
+    background-color: rgba(255,255,255,0.2);
 }
 
 /* --- SECTION AMIS --- */
-.lgt-friend-row {
+.lgt-friend-container {
     background-color: rgba(255,255,255,0.05);
     border-radius: 14px;
     margin-bottom: 8px;
+    overflow: hidden;
+}
+
+.lgt-friend-btn {
     padding: 10px;
+    width: 100%;
+    border-radius: 14px;
+}
+.lgt-friend-btn:hover { background-color: rgba(255,255,255,0.05); }
+
+/* DETAILS */
+.lgt-friend-details {
+    background-color: rgba(0,0,0,0.3);
+    padding: 15px;
+    border-top: 1px solid rgba(255,255,255,0.05);
 }
 
-.lgt-friend-avatar {
-    margin-right: 15px;
-}
+.lgt-detail-item { font-size: 12px; color: #ddd; font-weight: 600; margin-bottom: 2px; }
+.lgt-detail-item-small { font-size: 10px; color: #888; margin-top: 5px; }
 
+.lgt-friend-avatar { margin-right: 15px; }
 .lgt-friend-name { font-weight: 800; color: #fff; font-size: 16px; }
 .lgt-friend-logtime { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #aaa; }
 .lgt-friend-status { font-family: 'JetBrains Mono', monospace; font-weight: bold; font-size: 14px; }
