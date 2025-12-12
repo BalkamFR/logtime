@@ -1,7 +1,14 @@
 {
   "name": "42 Dashboard Ultimate",
   "description": "Logtime, Wallet et Amis.",
-  "uuid": "42-dashboard@papilaz",
-  "shell-version": ["46"],
+  "uuid": "logtime@papilaz",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA...",
+"shell-version": [
+  "42",
+  "43",
+  "44",
+  "45",
+  "46"
+],
   "version": 2
 }
