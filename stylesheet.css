@@ -51,10 +51,25 @@
     padding: 10px;
 }
 
-/* Note: Le style .lgt-friend-avatar est géré en JS pour le border-radius */
+/* AVATARS RONDS - Solution avec StButton */
 .lgt-friend-avatar {
     margin-right: 15px;
+    border-radius: 22px;
     background-color: #222;
+    min-width: 44px;
+    min-height: 44px;
+}
+
+.lgt-friend-avatar:hover {
+    background-color: #222;
+}
+
+.lgt-friend-avatar:active {
+    background-color: #222;
+}
+
+.lgt-friend-avatar StIcon {
+    border-radius: 22px;
 }
 
 .lgt-friend-name { font-weight: 800; color: #fff; font-size: 16px; }

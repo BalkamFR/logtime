@@ -1,4 +1,4 @@
-const { St, GLib, Clutter, Soup, GObject, Gio } = imports.gi;
+const { St, GLib, Clutter, Soup, GObject, Gio, GdkPixbuf } = imports.gi;
 const Main = imports.ui.main;
 const PanelMenu = imports.ui.panelMenu;
 const PopupMenu = imports.ui.popupMenu;
@@ -31,12 +31,27 @@ class DashboardIndicator extends PanelMenu.Button {
         });
 
         // Label Barre du haut
+        let topBox = new St.BoxLayout({ 
+            y_align: Clutter.ActorAlign.CENTER,
+            style_class: 'lgt-top-box'
+        });
+        
         this.buttonLabel = new St.Label({
             text: "...",
             y_align: Clutter.ActorAlign.CENTER,
             style_class: 'lgt-button-label'
         });
-        this.add_child(this.buttonLabel);
+        topBox.add_child(this.buttonLabel);
+        
+        // Badge nombre d'amis en ligne
+        this.onlineBadge = new St.Label({
+            text: "🟢 0",
+            y_align: Clutter.ActorAlign.CENTER,
+            style_class: 'lgt-online-badge'
+        });
+        topBox.add_child(this.onlineBadge);
+        
+        this.add_child(topBox);
 
         // --- MENU ---
         this.menu.box.style_class = 'lgt-popup-menu';
@@ -149,6 +164,7 @@ class DashboardIndicator extends PanelMenu.Button {
         
         if (friends.length === 0) {
             this.friendsBox.add_child(new St.Label({ text: "Ajoute tes amis...", style_class: 'lgt-stat-label' }));
+            this.onlineBadge.set_text("🟢 0");
             return;
         }
 
@@ -158,15 +174,27 @@ class DashboardIndicator extends PanelMenu.Button {
 
         // On va stocker les lignes créées ici pour les trier à la fin
         let loadedRows = [];
+        let onlineCount = 0;
 
         // On boucle sur les amis UN PAR UN avec "await"
         for (const login of friends) {
             // Création visuelle de la ligne
             let row = new St.BoxLayout({ style_class: 'lgt-friend-row', vertical: false });
             
-            // Avatar
-            let iconBin = new St.Bin({ style_class: 'lgt-friend-avatar', y_align: Clutter.ActorAlign.CENTER });
-            iconBin.set_child(new St.Icon({ icon_name: 'avatar-default-symbolic', icon_size: 44 }));
+            // Avatar - Utilisation de Clutter.Actor pour masque circulaire
+            let iconBin = new St.Bin({ 
+                style_class: 'lgt-friend-avatar',
+                y_align: Clutter.ActorAlign.CENTER,
+                width: 44,
+                height: 44
+            });
+            
+            let defaultIcon = new St.Icon({ 
+                icon_name: 'avatar-default-symbolic', 
+                icon_size: 44
+            });
+            iconBin.set_child(defaultIcon);
+            
             row.add_child(iconBin);
 
             // Infos
@@ -203,6 +231,7 @@ class DashboardIndicator extends PanelMenu.Button {
                 isActive = locs.length > 0 && locs[0].end_at === null;
                 
                 if (isActive) {
+                    onlineCount++;
                     statusLbl.set_text(`🟢 ${locs[0].host}`);
                     statusLbl.set_style("color: #2ed573; font-weight: bold;");
                 } else {
@@ -219,6 +248,9 @@ class DashboardIndicator extends PanelMenu.Button {
             // Pause finale avant le prochain ami
             await this._wait(600);
         }
+
+        // Mettre à jour le badge en ligne
+        this.onlineBadge.set_text(`🟢 ${onlineCount}`);
 
         // --- TRI FINAL UNE FOIS TOUT CHARGÉ ---
         // On trie le tableau : Online (true) en premier
@@ -242,11 +274,13 @@ class DashboardIndicator extends PanelMenu.Button {
 
     _downloadAndSetAvatar(url, login, iconBin) {
         let tmpPath = GLib.get_tmp_dir() + `/42_avatar_${login}.jpg`;
+        let tmpRoundPath = GLib.get_tmp_dir() + `/42_avatar_${login}_round.png`;
         let file = Gio.File.new_for_path(tmpPath);
+        let roundFile = Gio.File.new_for_path(tmpRoundPath);
         
-        if (file.query_exists(null)) {
-            let gicon = new Gio.FileIcon({ file: file });
-            iconBin.set_child(new St.Icon({ gicon: gicon, icon_size: 44, style_class: 'lgt-friend-avatar' }));
+        if (roundFile.query_exists(null)) {
+            let gicon = new Gio.FileIcon({ file: roundFile });
+            iconBin.set_child(new St.Icon({ gicon: gicon, icon_size: 44 }));
             return;
         }
 
@@ -256,11 +290,61 @@ class DashboardIndicator extends PanelMenu.Button {
                 try {
                     let contents = m.response_body.flatten().get_data();
                     GLib.file_set_contents(tmpPath, contents);
-                    let gicon = new Gio.FileIcon({ file: file });
-                    iconBin.set_child(new St.Icon({ gicon: gicon, icon_size: 44, style_class: 'lgt-friend-avatar' }));
-                } catch(e) {}
+                    
+                    // Créer une version ronde de l'image avec Cairo
+                    this._createRoundImage(tmpPath, tmpRoundPath);
+                    
+                    let gicon = new Gio.FileIcon({ file: roundFile });
+                    iconBin.set_child(new St.Icon({ gicon: gicon, icon_size: 44 }));
+                } catch(e) {
+                    log(`Error: ${e}`);
+                }
             }
         });
+    }
+    
+    _createRoundImage(inputPath, outputPath) {
+        const Cairo = imports.cairo;
+        const Gdk = imports.gi.Gdk;
+        
+        try {
+            // Charger l'image source à la taille exacte
+            let pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_scale(inputPath, 44, 44, false);
+            
+            // Si l'image n'est pas carrée, on la recadre au centre
+            let width = pixbuf.get_width();
+            let height = pixbuf.get_height();
+            
+            if (width != height) {
+                let size = Math.min(width, height);
+                let x = (width - size) / 2;
+                let y = (height - size) / 2;
+                pixbuf = GdkPixbuf.Pixbuf.new_subpixbuf(pixbuf, x, y, size, size);
+                pixbuf = pixbuf.scale_simple(44, 44, GdkPixbuf.InterpType.BILINEAR);
+            }
+            
+            // Créer une surface Cairo
+            let surface = new Cairo.ImageSurface(Cairo.Format.ARGB32, 44, 44);
+            let cr = new Cairo.Context(surface);
+            
+            // Fond transparent
+            cr.setOperator(Cairo.Operator.CLEAR);
+            cr.paint();
+            cr.setOperator(Cairo.Operator.OVER);
+            
+            // Créer un cercle de clipping
+            cr.arc(22, 22, 22, 0, 2 * Math.PI);
+            cr.clip();
+            
+            // Dessiner l'image dans le cercle (remplir tout le cercle)
+            Gdk.cairo_set_source_pixbuf(cr, pixbuf, 0, 0);
+            cr.paint();
+            
+            // Sauvegarder en PNG
+            surface.writeToPNG(outputPath);
+        } catch(e) {
+            log(`Error creating round image: ${e}`);
+        }
     }
 
     // Helper pour fetcher proprement avec await

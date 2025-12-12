@@ -1,9 +1,23 @@
+/* === BARRE DU HAUT === */
+.lgt-top-box {
+    spacing: 10px;
+}
+
 .lgt-button-label {
     font-family: 'JetBrains Mono', monospace;
     font-weight: 800;
     font-size: 15px;
     color: #ffffff;
-    margin: 0 8px;
+}
+
+.lgt-online-badge {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 700;
+    font-size: 13px;
+    color: #2ed573;
+    background-color: rgba(46, 213, 115, 0.15);
+    border-radius: 12px;
+    padding: 4px 10px;
 }
 
 .lgt-popup-menu {
@@ -25,7 +39,6 @@
 }
 
 .lgt-stats-grid { padding: 10px 0; }
-
 .lgt-stat-box {
     background-color: rgba(255,255,255,0.08);
     border-radius: 12px;
@@ -33,10 +46,8 @@
     margin: 6px;
     text-align: center;
 }
-
 .lgt-stat-label { font-size: 11px; color: #8b8b9b; font-weight: 600; text-transform: uppercase; }
 .lgt-stat-value { font-size: 16px; font-weight: 800; color: #ffffff; margin-top: 4px; }
-.lgt-danger { color: #ff4757; }
 
 .lgt-title {
     font-size: 12px;
@@ -54,37 +65,27 @@
     padding: 10px;
 }
 
-/* LE CONTENEUR ROND */
+/* AVATARS RONDS - Solution avec StButton */
 .lgt-friend-avatar {
-    width: 44px;
-    height: 44px;
-    border-radius: 99px; /* Force le rond */
     margin-right: 15px;
-    overflow: hidden; /* Coupe ce qui dépasse */
+    border-radius: 22px;
+    background-color: #222;
+    min-width: 44px;
+    min-height: 44px;
+}
+
+.lgt-friend-avatar:hover {
     background-color: #222;
 }
 
-/* L'IMAGE */
-.lgt-friend-avatar-img {
-    width: 44px;
-    height: 44px;
-    border-radius: 99px;
+.lgt-friend-avatar:active {
+    background-color: #222;
 }
 
-.lgt-friend-name {
-    font-weight: 800;
-    color: #fff;
-    font-size: 16px;
+.lgt-friend-avatar StIcon {
+    border-radius: 22px;
 }
 
-.lgt-friend-logtime {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 13px;
-    color: #aaa;
-}
-
-.lgt-friend-status {
-    font-family: 'JetBrains Mono', monospace;
-    font-weight: bold;
-    font-size: 14px;
-}
+.lgt-friend-name { font-weight: 800; color: #fff; font-size: 16px; }
+.lgt-friend-logtime { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #aaa; }
+.lgt-friend-status { font-family: 'JetBrains Mono', monospace; font-weight: bold; font-size: 14px; }
