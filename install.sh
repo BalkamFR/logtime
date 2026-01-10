@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # --- CONFIGURATION ---
-UUID="logtime"
+UUID="logtime@42"
 EXT_DIR="$HOME/.local/share/gnome-shell/extensions/$UUID"
 
 # Couleurs pour le style
