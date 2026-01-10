@@ -12,7 +12,7 @@ Extension **GNOME Shell** ultra-rapide pour suivre en temps réel ton **Logtime*
 2. Lance le script d’installation :
 
 ```bash
-git clone https://github.com/BalkamFR/logtime.git && cd logtime && chmod +x install.sh && ./install.sh && busctl --user call org.gnome.Shell /org/gnome/Shell org.gnome.Shell Eval s 'Meta.restart("Reloading")'
+git clone https://github.com/BalkamFR/logtime.git && cd logtime && chmod +x install.sh && ./install.sh
 
 ```
 
