@@ -2,6 +2,21 @@
 <schemalist gettext-domain="logtime">
   <schema id="org.gnome.shell.extensions.logtime" path="/org/gnome/shell/extensions/logtime/">
     
+    <key name="api-uid" type="s">
+      <default>""</default>
+      <summary>42 API UID</summary>
+    </key>
+
+    <key name="api-secret" type="s">
+      <default>""</default>
+      <summary>42 API Secret</summary>
+    </key>
+
+    <key name="username" type="s">
+      <default>""</default>
+      <summary>Ton Login 42</summary>
+    </key>
+
     <key name="friends-list" type="as">
       <default>[]</default>
       <summary>Liste des amis</summary>
