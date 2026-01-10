@@ -4,54 +4,41 @@
 UUID="logtime@42"
 EXT_DIR="$HOME/.local/share/gnome-shell/extensions/$UUID"
 
-# Couleurs pour le style
+# Couleurs
 GREEN='\033[0;32m'
 CYAN='\033[0;36m'
 YELLOW='\033[1;33m'
-NC='\033[0m' # No Color
+RED='\033[0;31m'
+NC='\033[0m'
 
 echo -e "${CYAN}🚀 Installation de 42 Dashboard Ultimate...${NC}"
 
-# 1. Créer le dossier de destination
-if [ ! -d "$EXT_DIR" ]; then
-    mkdir -p "$EXT_DIR"
-else
-    echo -e "♻️  Nettoyage de l'ancienne version..."
-    rm -rf "$EXT_DIR"/*
-fi
-
-# 2. Copier les fichiers
-# On copie tout sauf le script d'install et le readme
+# ... (Le début du script reste identique : création dossier, copie, compile) ...
+# Je remets le début pour être sûr que tu as le contexte, mais tu peux garder le tien
+if [ ! -d "$EXT_DIR" ]; then mkdir -p "$EXT_DIR"; else rm -rf "$EXT_DIR"/*; fi
 cp -r * "$EXT_DIR" 2>/dev/null
-# Nettoyage des fichiers non nécessaires dans la destination
-rm "$EXT_DIR/install.sh" 2>/dev/null
-rm "$EXT_DIR/README.md" 2>/dev/null
-echo -e "📂 Fichiers copiés."
-
-# 3. Compiler le schéma GSettings
-echo -e "⚙️  Compilation des schémas..."
+rm "$EXT_DIR/install.sh" "$EXT_DIR/README.md" 2>/dev/null
 glib-compile-schemas "$EXT_DIR"
-
-# 4. Gestion de l'activation
-# On désactive d'abord pour être sûr que GNOME prenne en compte le changement d'état
 gnome-extensions disable "$UUID" 2>/dev/null
-echo -e "🔌 Activation de l'extension..."
 gnome-extensions enable "$UUID"
 
-echo -e "\n${GREEN}✅ INSTALLATION DES FICHIERS TERMINÉE !${NC}"
+echo -e "${GREEN}✅ FICHIERS INSTALLÉS.${NC}"
 
-# 5. AUTO-RELOAD (La partie magique)
-# On vérifie si on est sur X11 (Standard 42) ou Wayland
+# --- PARTIE MODIFIÉE : LE REDÉMARRAGE ---
+
+# Vérification stricte : Est-ce qu'on est sur X11 ?
 if [ "$XDG_SESSION_TYPE" == "x11" ]; then
-    echo -e "${YELLOW}🔄 Redémarrage automatique de GNOME Shell... (L'écran va clignoter)${NC}"
+    echo -e "${YELLOW}🔄 Redémarrage forcé de GNOME Shell...${NC}"
     sleep 1
-    # Cette commande simule exactement Alt+F2 puis 'r'
-    busctl --user call org.gnome.Shell /org/gnome/Shell org.gnome.Shell Eval s 'global.reexec_self()'
     
-    echo -e "${GREEN}✨ Tout est prêt !${NC}"
+    # Envoie le signal SIGQUIT (3) à gnome-shell.
+    # Sur X11, le système va voir que le shell a "planté" et le relancer immédiatement.
+    # Tes fenêtres ouvertes ne seront PAS fermées.
+    killall -3 gnome-shell
+    
 else
-    # Sur Wayland, le redémarrage du shell tue la session, on ne peut pas le faire auto.
-    echo -e "${YELLOW}⚠️  Tu es sous Wayland (ou session inconnue).${NC}"
-    echo -e "   Le redémarrage auto n'est pas supporté sans déconnexion."
-    echo -e "   Si l'extension ne s'affiche pas, déconnecte-toi et reconnecte-toi."
+    # Sécurité pour ne pas casser une session Wayland (si tu l'utilises chez toi)
+    echo -e "${RED}⚠️  Attention : Tu n'es pas sous X11 ($XDG_SESSION_TYPE).${NC}"
+    echo -e "   Je ne peux pas redémarrer le shell automatiquement sans te déconnecter."
+    echo -e "   Fais la combinaison manuelle : Alt+F2, tape 'r', Entrée."
 fi
