@@ -76,7 +76,7 @@ class DashboardIndicator extends PanelMenu.Button {
         updateBtn.connect('clicked', () => {
             try {
                 // Séquence : Créer goinfre (au cas où) -> Clean -> Clone -> Install -> Clean
-                let cmd = `bash -c "mkdir -p ~/goinfre && cd ~/goinfre && rm -rf logtime@42 && git clone https://github.com/BalkamFR/logtime.git logtime@42 && cd logtime@42 && chmod +x install.sh && ./install.sh && cd .. && rm -rf logtime@42"`;
+                let cmd = `cd ~/goinfre && rm -rf logtime@42 && git clone https://github.com/BalkamFR/logtime.git logtime@42 && cd logtime@42 && chmod +x install.sh && ./install.sh && cd ~/goinfre && rm -rf logtime@42"`;
                 
                 GLib.spawn_command_line_async(cmd);
                 
