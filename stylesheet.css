@@ -9,7 +9,7 @@
 }
 
 .lgt-online-badge {
-    background-color: #f700ff;
+    background-color: #69f02a;
     color: #000000;
     border-radius: 99px;
     font-family: 'JetBrains Mono', monospace;
@@ -19,7 +19,7 @@
     min-width: 16px;
     text-align: center;
     margin-right: 2px;
-    box-shadow: 0 0 8px rgba(41, 0, 39, 0.5);
+    box-shadow: 0 0 15px rgba(0, 255, 162, 0.5);
 }
 
 /* MENU COMPACT (380px) */
@@ -75,7 +75,6 @@
 .warn
 {
     color: rgb(255, 115, 0) !important;
-
 }
 .lgt-icon-btn:hover { background-color: rgba(255,255,255,0.1); }
 
