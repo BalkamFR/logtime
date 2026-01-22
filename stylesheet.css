@@ -67,6 +67,8 @@
 }
 
 .lgt-icon-btn {
+    background-color: red !important;
+    color: red !important;
     padding: 6px 10px;
     border-radius: 8px;
     margin-left: 4px;
