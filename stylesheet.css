@@ -11,7 +11,7 @@
 .lgt-online-badge {
     background-color: #132fff;
     color: #000000;
-    border-radius: 99px;clear
+    border-radius: 99px;
     font-family: 'JetBrains Mono', monospace;
     font-weight: 900;
     font-size: 12px;
@@ -19,7 +19,7 @@
     min-width: 16px;
     text-align: center;
     margin-right: 2px;
-    box-shadow: 0 0 8px rgba(58, 68, 255, 0.5);
+    box-shadow: 0 0 8px rgba(28, 39, 249, 0.5);
 }
 
 /* MENU COMPACT (380px) */
