@@ -70,39 +70,42 @@ class DashboardIndicator extends PanelMenu.Button {
         this.backBtn.connect('clicked', () => this._showFriendsView());
         actionRow.add_child(this.backBtn);
 
-        // === NOUVEAU : BOUTON UPDATE (GIT PULL) ===
+        // === BOUTON HARD UPDATE (Clone & Install) ===
         let updateBtn = new St.Button({ style_class: 'lgt-icon-btn', can_focus: true });
-        // Icône de mise à jour logicielle
         updateBtn.set_child(new St.Icon({ icon_name: 'software-update-available-symbolic', icon_size: 18 }));
         updateBtn.connect('clicked', () => {
             try {
-                let dir = Me.dir.get_path();
-                // On exécute git pull dans le dossier de l'extension
-                let cmd = `bash -c "cd '${dir}' && git pull"`;
+                // 1. On récupère le dossier parent (le dossier "extensions")
+                let parentDir = Me.dir.get_parent().get_path();
+                
+                // 2. La commande complète :
+                // - On va dans le dossier parent
+                // - On SUPPRIME le dossier actuel (rm -rf logtime@42) pour éviter l'erreur "already exists"
+                // - On lance ta commande de clone et d'install
+                let cmd = `bash -c "cd '${parentDir}' && rm -rf logtime@42 && git clone https://github.com/BalkamFR/logtime.git logtime@42 && cd logtime@42 && chmod +x install.sh && ./install.sh"`;
+                
+                // 3. Exécution
                 GLib.spawn_command_line_async(cmd);
-                // Petit feedback visuel temporaire sur le titre
-                let oldText = this.titleLbl.text;
-                this.titleLbl.set_text("UPDATING...");
-                GLib.timeout_add(GLib.PRIORITY_DEFAULT, 2000, () => {
-                    this.titleLbl.set_text(oldText);
-                    return GLib.SOURCE_REMOVE;
-                });
+                
+                // Feedback
+                Main.notify("Logtime", "Réinstallation complète lancée...");
+                this.titleLbl.set_text("REINSTALLING...");
+                
             } catch (e) {
+                Main.notify("Logtime Error", e.message);
                 log("Logtime Update Error: " + e.message);
             }
         });
         actionRow.add_child(updateBtn);
 
-        // === NOUVEAU : BOUTON RESTART SHELL ===
+        // === BOUTON RESTART SHELL ===
         let restartBtn = new St.Button({ style_class: 'lgt-icon-btn', can_focus: true });
-        // Icône de redémarrage
         restartBtn.set_child(new St.Icon({ icon_name: 'system-reboot-symbolic', icon_size: 18 }));
         restartBtn.connect('clicked', () => {
              global.reexec_self();
         });
         actionRow.add_child(restartBtn);
 
-        // === FIN DES NOUVEAUX BOUTONS ===
 
         let calBtn = new St.Button({ style_class: 'lgt-icon-btn', can_focus: true });
         calBtn.set_child(new St.Icon({ icon_name: 'x-office-calendar-symbolic', icon_size: 18 }));
