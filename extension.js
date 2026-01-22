@@ -33,7 +33,7 @@ class DashboardIndicator extends PanelMenu.Button {
             this._settings.connect(`changed::day-${i}`, () => this._updateTimeLabel()); 
         }
 
-        // --- TOP BAR ---
+        // --- TOP BAR (Panel) ---
         let topBox = new St.BoxLayout({ y_align: Clutter.ActorAlign.CENTER, style_class: 'lgt-top-box' });
         
         this.onlineBadge = new St.Label({ text: "0", y_align: Clutter.ActorAlign.CENTER, style_class: 'lgt-online-badge' });
@@ -42,6 +42,12 @@ class DashboardIndicator extends PanelMenu.Button {
 
         this.buttonLabel = new St.Label({ text: "...", y_align: Clutter.ActorAlign.CENTER, style_class: 'lgt-button-label' });
         topBox.add_child(this.buttonLabel);
+
+        // --- AJOUT DU TRIANGLE (Flèche vers le bas) ---
+        let arrowIcon = new St.Icon({ icon_name: 'pan-down-symbolic', style_class: 'system-status-icon', y_align: Clutter.ActorAlign.CENTER });
+        topBox.add_child(arrowIcon);
+        // ---------------------------------------------
+
         this.add_child(topBox);
 
         // --- MENU ---
@@ -70,36 +76,40 @@ class DashboardIndicator extends PanelMenu.Button {
         this.backBtn.connect('clicked', () => this._showFriendsView());
         actionRow.add_child(this.backBtn);
 
-// === BOUTON UPDATE (GOINFRE INSTALL) ===
+        // === BOUTON UPDATE (GOINFRE INSTALL) ===
         let updateBtn = new St.Button({ style_class: 'lgt-icon-btn warn', can_focus: true });
         updateBtn.set_child(new St.Icon({ icon_name: 'dialog-warning-symbolic.svg', icon_size: 18 }));
         updateBtn.connect('clicked', () => {
             try {
-                // Je garde ta commande exacte, juste encapsulée dans bash -c pour l'exécution
-                // J'ajoute mkdir -p ~/goinfre au début par sécurité au cas où le dossier n'existe pas
                 let cmd = `bash -c "cd ~/goinfre && rm -rf logtime@42 && git clone https://github.com/BalkamFR/logtime.git logtime@42 && cd logtime@42 && chmod +x install.sh && ./install.sh"`;
-                
-                // Exécution asynchrone
                 GLib.spawn_command_line_async(cmd);
-                
                 Main.notify("Logtime", "Réinstallation via ~/goinfre lancée...");
-                
-                // Feedback visuel
                 let oldText = this.titleLbl.text;
                 this.titleLbl.set_text("INSTALLING...");
-                
                 GLib.timeout_add(GLib.PRIORITY_DEFAULT, 5000, () => {
                     this.titleLbl.set_text(oldText);
                     return GLib.SOURCE_REMOVE;
                 });
-
             } catch (e) {
                 Main.notify("Logtime Error", e.message);
-                log("Logtime Update Error: " + e.message);
             }
         });
         actionRow.add_child(updateBtn);
 
+        // === BOUTON MON PROFIL ===
+        let myProfileBtn = new St.Button({ style_class: 'lgt-icon-btn', can_focus: true });
+        // Icône bonhomme pour le profil
+        myProfileBtn.set_child(new St.Icon({ icon_name: 'avatar-default-symbolic', icon_size: 18 })); 
+        myProfileBtn.connect('clicked', () => {
+            let user = this._settings.get_string('username');
+            if (user) {
+                Gio.AppInfo.launch_default_for_uri(`https://profile.intra.42.fr/users/${user}`, null);
+            } else {
+                Main.notify("Logtime", "Configure ton login d'abord !");
+            }
+        });
+        actionRow.add_child(myProfileBtn);
+        // =========================
 
         let calBtn = new St.Button({ style_class: 'lgt-icon-btn', can_focus: true });
         calBtn.set_child(new St.Icon({ icon_name: 'x-office-calendar-symbolic', icon_size: 18 }));
@@ -194,10 +204,8 @@ class DashboardIndicator extends PanelMenu.Button {
         this._myLocsRaw = await this._fetchJsonPromise(`https://api.intra.42.fr/v2/users/${username}/locations?range[begin_at]=${start},${end}&per_page=100`, token);
         
         if (Array.isArray(this._myLocsRaw)) {
-            // Calcul du temps total
             this._currentLogtimeMs = this._myLocsRaw.reduce((a, l) => a + ((l.end_at ? new Date(l.end_at) : new Date()) - new Date(l.begin_at)), 0);
             
-            // Stats Aujourd'hui
             let todayStr = new Date().toDateString();
             let todayMs = 0;
             this._myLocsRaw.forEach(l => {
@@ -210,8 +218,6 @@ class DashboardIndicator extends PanelMenu.Button {
             let th = Math.floor(todayMs/3600000);
             let tm = Math.floor((todayMs%3600000)/60000);
             this.todayLbl.set_text(`${th}h${tm.toString().padStart(2,'0')}`);
-
-            // Mise à jour des labels (Top Bar + Target Daily)
             this._updateTimeLabel();
         }
 
@@ -227,18 +233,13 @@ class DashboardIndicator extends PanelMenu.Button {
     }
 
     _updateTimeLabel() {
-        // 1. Calcul du total fait
         let h = Math.floor(this._currentLogtimeMs/3600000);
         let m = Math.floor((this._currentLogtimeMs%3600000)/60000);
-        
-        // 2. Calcul de l'objectif mensuel
         let giftDays = this._settings.get_int('gift-days');
-        let targetHours = Math.max(0, 154 - (giftDays * 7)); // 154h approx pour le mois complet
+        let targetHours = Math.max(0, 154 - (giftDays * 7));
         
         this.buttonLabel.set_text(`${h}h ${m}m / ${targetHours}h`);
         this.timeDisplay.set_text(`Logtime ${h}h ${m}m`);
-
-        // 3. Calcul de la moyenne par jour restant
         this._calculateDailyTarget(targetHours, this._currentLogtimeMs);
     }
 
@@ -248,24 +249,19 @@ class DashboardIndicator extends PanelMenu.Button {
 
         if (remainingHours <= 0) {
             this.targetDailyLbl.set_text("Fini!");
-            this.targetDailyLbl.style = "color: #2ed573;"; // Vert
+            this.targetDailyLbl.style = "color: #2ed573;";
             return;
         }
 
         let now = new Date();
-        // Fin du mois
         let endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
         let todayDate = now.getDate();
         let lastDate = endOfMonth.getDate();
-
         let workableDaysCount = 0;
 
-        // On itère de "Aujourd'hui" jusqu'à la fin du mois
         for (let d = todayDate; d <= lastDate; d++) {
             let tempDate = new Date(now.getFullYear(), now.getMonth(), d);
-            let dayIndex = tempDate.getDay(); // 0 = Dimanche, 1 = Lundi...
-            
-            // On vérifie si l'utilisateur a activé ce jour dans les prefs
+            let dayIndex = tempDate.getDay();
             let isWorkingDay = this._settings.get_boolean(`day-${dayIndex}`);
             if (isWorkingDay) {
                 workableDaysCount++;
@@ -273,7 +269,6 @@ class DashboardIndicator extends PanelMenu.Button {
         }
 
         if (workableDaysCount === 0) {
-            // Aucun jour dispo sélectionné
             this.targetDailyLbl.set_text("∞");
             return;
         }
@@ -283,7 +278,7 @@ class DashboardIndicator extends PanelMenu.Button {
         let dm = Math.floor((dailyAvg - dh) * 60);
 
         this.targetDailyLbl.set_text(`${dh}h${dm.toString().padStart(2,'0')}`);
-        this.targetDailyLbl.style = ""; // Reset style
+        this.targetDailyLbl.style = "";
     }
 
     _processHistory(locations, title) {
@@ -304,7 +299,6 @@ class DashboardIndicator extends PanelMenu.Button {
         this.titleLbl.set_text(title.toUpperCase());
         this.backBtn.show();
 
-        // Layout GRILLE
         let grid = new St.Widget({ layout_manager: new Clutter.GridLayout(), style_class: 'lgt-cal-grid' });
         let layout = grid.layout_manager;
         
@@ -383,6 +377,7 @@ class DashboardIndicator extends PanelMenu.Button {
 
             let statusLbl = new St.Label({ text: "⚫", style_class: 'lgt-friend-status', y_align: Clutter.ActorAlign.CENTER });
             row.add_child(statusLbl);
+
             headerBtn.set_child(row);
             mainContainer.add_child(headerBtn);
 
