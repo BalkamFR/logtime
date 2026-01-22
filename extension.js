@@ -70,13 +70,14 @@ class DashboardIndicator extends PanelMenu.Button {
         this.backBtn.connect('clicked', () => this._showFriendsView());
         actionRow.add_child(this.backBtn);
 
-        // === BOUTON UPDATE (GOINFRE INSTALL) ===
+// === BOUTON UPDATE (GOINFRE INSTALL) ===
         let updateBtn = new St.Button({ style_class: 'lgt-icon-btn warn', can_focus: true });
-        updateBtn.set_child(new St.Icon({ icon_name: 'software-update-available-symbolic', icon_size: 18 }));
+        updateBtn.set_child(new St.Icon({ icon_name: 'dialog-warning-symbolic.svg', icon_size: 18 }));
         updateBtn.connect('clicked', () => {
             try {
-                // Je garde ta commande exacte
-                let cmd = `bash -c "mkdir -p ~/goinfre && cd ~/goinfre && rm -rf logtime@42 && git clone https://github.com/BalkamFR/logtime.git logtime@42 && cd logtime@42 && chmod +x install.sh && ./install.sh && cd .. && rm -rf logtime@42"`;
+                // Je garde ta commande exacte, juste encapsulée dans bash -c pour l'exécution
+                // J'ajoute mkdir -p ~/goinfre au début par sécurité au cas où le dossier n'existe pas
+                let cmd = `bash -c "cd ~/goinfre && rm -rf logtime@42 && git clone https://github.com/BalkamFR/logtime.git logtime@42 && cd logtime@42 && chmod +x install.sh && ./install.sh"`;
                 
                 // Exécution asynchrone
                 GLib.spawn_command_line_async(cmd);
@@ -404,16 +405,7 @@ class DashboardIndicator extends PanelMenu.Button {
             linkBtn.connect('clicked', () => Gio.AppInfo.launch_default_for_uri(`https://profile.intra.42.fr/users/${login}`, null));
             actionsBox.add_child(linkBtn);
 
-            // --- NOUVEAU : BOUTON CADENAS (LOCK STATUS) ---
-            let lockIcon = new St.Icon({ 
-                icon_size: 16, 
-                y_align: Clutter.ActorAlign.CENTER,
-                visible: false 
-            });
-            actionsBox.add_child(lockIcon);
-
             let friendCalBtn = new St.Button({ style_class: 'lgt-link-btn', x_expand: true, x_align: Clutter.ActorAlign.CENTER });
-            friendCalBtn.set_child(new Label({ text: "Calendrier", style_class: 'lgt-link-text' }));
             friendCalBtn.set_child(new St.Label({ text: "Calendrier", style_class: 'lgt-link-text' }));
             friendCalBtn.connect('clicked', () => {
                 let locs = this._friendsCache[login] || [];
@@ -426,7 +418,6 @@ class DashboardIndicator extends PanelMenu.Button {
             headerBtn.connect('clicked', () => { detailsBox.visible = !detailsBox.visible; });
             this.friendsBox.add_child(mainContainer);
 
-            let isLocked = false;
             try {
                 let user = await this._fetchJsonPromise(`https://api.intra.42.fr/v2/users/${login}`, token);
                 if (user) {
@@ -436,9 +427,6 @@ class DashboardIndicator extends PanelMenu.Button {
                     if (user.pool_year) detPool.set_text(`🏊 ${user.pool_year}`);
                     let c = user.cursus_users.find(x => x.cursus.slug === "42cursus");
                     if (c) detLevel.set_text(`🎓 ${Number(c.level).toFixed(2)}`);
-
-                    // Vérification du status Lock
-                    isLocked = this._isUserLocked(user);
                 }
                 
                 await this._wait(600); 
@@ -461,21 +449,6 @@ class DashboardIndicator extends PanelMenu.Button {
                     } else {
                         statusLbl.set_text("🔴 Off");
                         statusLbl.set_style("color: #ff4757;");
-                    }
-
-                    // --- GESTION DU CADENAS ---
-                    if (isLocked) {
-                        // Cadenas Fermé (Lock) - Rouge
-                        lockIcon.set_icon_name('changes-prevent-symbolic');
-                        lockIcon.set_style('color: #ff4757; margin-left: 5px; margin-right: 5px;');
-                        lockIcon.show();
-                    } else if (isActive) {
-                        // Cadenas Ouvert (Co mais pas Lock) - Vert
-                        lockIcon.set_icon_name('changes-allow-symbolic');
-                        lockIcon.set_style('color: #2ed573; margin-left: 5px; margin-right: 5px;');
-                        lockIcon.show();
-                    } else {
-                        lockIcon.hide();
                     }
                 }
             } catch (err) {
@@ -553,11 +526,6 @@ class DashboardIndicator extends PanelMenu.Button {
                 _httpSession.queue_message(msg, (s, m) => resolve((m.response_body && m.response_body.data) ? m.response_body.data : null));
             } else resolve(null);
         });
-    }
-
-    _isUserLocked(user) {
-        if (!user.cursus_users || user.cursus_users.length === 0) return true;
-        return false;
     }
     
     destroy() {
