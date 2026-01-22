@@ -25,7 +25,7 @@ class DashboardIndicator extends PanelMenu.Button {
 
         // Listeners
         this._settings.connect('changed::friends-list', () => this._refresh());
-        this._settings.connect('changed::gift-days', () => this._refresh()); // Changé pour refresh tout le calcul
+        this._settings.connect('changed::gift-days', () => this._refresh()); 
         this._settings.connect('changed::username', () => this._refresh());
         
         // Listener pour les jours de la semaine (day-0 à day-6)
@@ -55,7 +55,6 @@ class DashboardIndicator extends PanelMenu.Button {
         this.walletLbl = this._createStatBox(statsBox, "Wallet", "-");
         this.evalLbl = this._createStatBox(statsBox, "Eval", "-");
         this.todayLbl = this._createStatBox(statsBox, "Aujourd'hui", "-");
-        // NOUVEAU : Cible journalière
         this.targetDailyLbl = this._createStatBox(statsBox, "Cible/J", "-"); 
         this.menu.box.add_child(statsBox);
 
@@ -70,6 +69,40 @@ class DashboardIndicator extends PanelMenu.Button {
         this.backBtn.set_child(new St.Icon({ icon_name: 'go-previous-symbolic', icon_size: 18 }));
         this.backBtn.connect('clicked', () => this._showFriendsView());
         actionRow.add_child(this.backBtn);
+
+        // === NOUVEAU : BOUTON UPDATE (GIT PULL) ===
+        let updateBtn = new St.Button({ style_class: 'lgt-icon-btn', can_focus: true });
+        // Icône de mise à jour logicielle
+        updateBtn.set_child(new St.Icon({ icon_name: 'software-update-available-symbolic', icon_size: 18 }));
+        updateBtn.connect('clicked', () => {
+            try {
+                let dir = Me.dir.get_path();
+                // On exécute git pull dans le dossier de l'extension
+                let cmd = `bash -c "cd '${dir}' && git pull"`;
+                GLib.spawn_command_line_async(cmd);
+                // Petit feedback visuel temporaire sur le titre
+                let oldText = this.titleLbl.text;
+                this.titleLbl.set_text("UPDATING...");
+                GLib.timeout_add(GLib.PRIORITY_DEFAULT, 2000, () => {
+                    this.titleLbl.set_text(oldText);
+                    return GLib.SOURCE_REMOVE;
+                });
+            } catch (e) {
+                log("Logtime Update Error: " + e.message);
+            }
+        });
+        actionRow.add_child(updateBtn);
+
+        // === NOUVEAU : BOUTON RESTART SHELL ===
+        let restartBtn = new St.Button({ style_class: 'lgt-icon-btn', can_focus: true });
+        // Icône de redémarrage
+        restartBtn.set_child(new St.Icon({ icon_name: 'system-reboot-symbolic', icon_size: 18 }));
+        restartBtn.connect('clicked', () => {
+             global.reexec_self();
+        });
+        actionRow.add_child(restartBtn);
+
+        // === FIN DES NOUVEAUX BOUTONS ===
 
         let calBtn = new St.Button({ style_class: 'lgt-icon-btn', can_focus: true });
         calBtn.set_child(new St.Icon({ icon_name: 'x-office-calendar-symbolic', icon_size: 18 }));
@@ -255,8 +288,6 @@ class DashboardIndicator extends PanelMenu.Button {
         this.targetDailyLbl.set_text(`${dh}h${dm.toString().padStart(2,'0')}`);
         this.targetDailyLbl.style = ""; // Reset style
     }
-
-    // ... (Le reste des méthodes: _processHistory, _showFriendsView, _updateFriendsList, etc. restent identiques)
 
     _processHistory(locations, title) {
         if (!Array.isArray(locations)) locations = [];
