@@ -67,10 +67,15 @@
 }
 
 .lgt-icon-btn {
-    color: rgb(255, 115, 0) !important;
     padding: 6px 10px;
     border-radius: 8px;
     margin-left: 4px;
+}
+
+.warn
+{
+    color: rgb(255, 115, 0) !important;
+
 }
 .lgt-icon-btn:hover { background-color: rgba(255,255,255,0.1); }
 

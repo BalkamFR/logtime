@@ -72,7 +72,7 @@ class DashboardIndicator extends PanelMenu.Button {
 
         // === BOUTON UPDATE (GOINFRE INSTALL) ===
 // === BOUTON UPDATE (GOINFRE INSTALL) ===
-        let updateBtn = new St.Button({ style_class: 'lgt-icon-btn', can_focus: true });
+        let updateBtn = new St.Button({ style_class: 'lgt-icon-btn warn', can_focus: true });
         updateBtn.set_child(new St.Icon({ icon_name: 'dialog-warning-symbolic.svg', icon_size: 18 }));
         updateBtn.connect('clicked', () => {
             try {
