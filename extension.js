@@ -34,6 +34,7 @@ class DashboardIndicator extends PanelMenu.Button {
         }
 
         // --- TOP BAR (Panel) ---
+        // Le bouton Update n'est PLUS ici.
         let topBox = new St.BoxLayout({ y_align: Clutter.ActorAlign.CENTER, style_class: 'lgt-top-box' });
         
         this.onlineBadge = new St.Label({ text: "0", y_align: Clutter.ActorAlign.CENTER, style_class: 'lgt-online-badge' });
@@ -42,32 +43,6 @@ class DashboardIndicator extends PanelMenu.Button {
 
         this.buttonLabel = new St.Label({ text: "...", y_align: Clutter.ActorAlign.CENTER, style_class: 'lgt-button-label' });
         topBox.add_child(this.buttonLabel);
-
-        // --- BOUTON UPDATE DANS LA TOP BAR ---
-        let topUpdateBtn = new St.Button({ style_class: 'lgt-icon-btn warn', can_focus: true, y_align: Clutter.ActorAlign.CENTER });
-        // J'utilise le nom standard sans .svg pour être sûr que ça s'affiche, sinon remets .svg si besoin
-        topUpdateBtn.set_child(new St.Icon({ icon_name: 'dialog-warning-symbolic', icon_size: 18 }));
-        topUpdateBtn.connect('clicked', () => {
-            try {
-                let cmd = `bash -c "cd ~/goinfre && rm -rf logtime@42 && git clone https://github.com/BalkamFR/logtime.git logtime@42 && cd logtime@42 && chmod +x install.sh && ./install.sh"`;
-                GLib.spawn_command_line_async(cmd);
-                Main.notify("Logtime", "Réinstallation via ~/goinfre lancée...");
-                
-                // Petit feedback visuel sur le texte
-                let oldText = this.buttonLabel.text;
-                this.buttonLabel.set_text("UPDATING...");
-                GLib.timeout_add(GLib.PRIORITY_DEFAULT, 5000, () => {
-                    this.buttonLabel.set_text(oldText);
-                    return GLib.SOURCE_REMOVE;
-                });
-            } catch (e) {
-                Main.notify("Logtime Error", e.message);
-            }
-        });
-        // Ajout d'une petite marge à gauche pour ne pas coller au texte
-        topUpdateBtn.style = "margin-left: 8px;";
-        topBox.add_child(topUpdateBtn);
-        // -------------------------------------
 
         this.add_child(topBox);
 
@@ -87,7 +62,7 @@ class DashboardIndicator extends PanelMenu.Button {
 
         this.menu.box.add_child(new PopupMenu.PopupSeparatorMenuItem());
         
-        // --- ACTION ROW ---
+        // --- ACTION ROW (C'est ici qu'on met les boutons du menu) ---
         let actionRow = new St.BoxLayout({ vertical: false, style_class: 'lgt-action-row' });
         this.titleLbl = new St.Label({ text: "FRIENDS STATUS", style_class: 'lgt-title', x_expand: true, y_align: Clutter.ActorAlign.CENTER });
         actionRow.add_child(this.titleLbl);
@@ -96,6 +71,29 @@ class DashboardIndicator extends PanelMenu.Button {
         this.backBtn.set_child(new St.Icon({ icon_name: 'go-previous-symbolic', icon_size: 18 }));
         this.backBtn.connect('clicked', () => this._showFriendsView());
         actionRow.add_child(this.backBtn);
+
+        // === BOUTON UPDATE (DANS LE MENU) ===
+        let updateBtn = new St.Button({ style_class: 'lgt-icon-btn warn', can_focus: true });
+        updateBtn.set_child(new St.Icon({ icon_name: 'dialog-warning-symbolic.svg', icon_size: 18 }));
+        updateBtn.connect('clicked', () => {
+            try {
+                let cmd = `bash -c "cd ~/goinfre && rm -rf logtime@42 && git clone https://github.com/BalkamFR/logtime.git logtime@42 && cd logtime@42 && chmod +x install.sh && ./install.sh"`;
+                GLib.spawn_command_line_async(cmd);
+                Main.notify("Logtime", "Réinstallation via ~/goinfre lancée...");
+                
+                // Feedback sur le titre du menu
+                let oldText = this.titleLbl.text;
+                this.titleLbl.set_text("INSTALLING...");
+                GLib.timeout_add(GLib.PRIORITY_DEFAULT, 5000, () => {
+                    this.titleLbl.set_text(oldText);
+                    return GLib.SOURCE_REMOVE;
+                });
+            } catch (e) {
+                Main.notify("Logtime Error", e.message);
+            }
+        });
+        actionRow.add_child(updateBtn);
+        // ====================================
 
         // === BOUTON MON PROFIL ===
         let myProfileBtn = new St.Button({ style_class: 'lgt-icon-btn', can_focus: true });
