@@ -8,7 +8,7 @@ const Me = ExtensionUtils.getCurrentExtension();
 let _httpSession;
 try {
     _httpSession = new Soup.SessionAsync();
-    _httpSession.user_agent = 'LogtimeExtension/18.0';
+    _httpSession.user_agent = 'LogtimeExtension/19.0';
     _httpSession.timeout = 10;
 } catch (e) {
     _httpSession = new Soup.Session();
@@ -25,8 +25,13 @@ class DashboardIndicator extends PanelMenu.Button {
 
         // Listeners
         this._settings.connect('changed::friends-list', () => this._refresh());
-        this._settings.connect('changed::gift-days', () => this._updateTimeLabel());
+        this._settings.connect('changed::gift-days', () => this._refresh()); // Changé pour refresh tout le calcul
         this._settings.connect('changed::username', () => this._refresh());
+        
+        // Listener pour les jours de la semaine (day-0 à day-6)
+        for(let i=0; i<7; i++) {
+            this._settings.connect(`changed::day-${i}`, () => this._updateTimeLabel()); 
+        }
 
         // --- TOP BAR ---
         let topBox = new St.BoxLayout({ y_align: Clutter.ActorAlign.CENTER, style_class: 'lgt-top-box' });
@@ -50,6 +55,8 @@ class DashboardIndicator extends PanelMenu.Button {
         this.walletLbl = this._createStatBox(statsBox, "Wallet", "-");
         this.evalLbl = this._createStatBox(statsBox, "Eval", "-");
         this.todayLbl = this._createStatBox(statsBox, "Aujourd'hui", "-");
+        // NOUVEAU : Cible journalière
+        this.targetDailyLbl = this._createStatBox(statsBox, "Cible/J", "-"); 
         this.menu.box.add_child(statsBox);
 
         this.menu.box.add_child(new PopupMenu.PopupSeparatorMenuItem());
@@ -157,14 +164,15 @@ class DashboardIndicator extends PanelMenu.Button {
         this._myLocsRaw = await this._fetchJsonPromise(`https://api.intra.42.fr/v2/users/${username}/locations?range[begin_at]=${start},${end}&per_page=100`, token);
         
         if (Array.isArray(this._myLocsRaw)) {
+            // Calcul du temps total
             this._currentLogtimeMs = this._myLocsRaw.reduce((a, l) => a + ((l.end_at ? new Date(l.end_at) : new Date()) - new Date(l.begin_at)), 0);
-            this._updateTimeLabel();
-
-            let today = new Date().toDateString();
+            
+            // Stats Aujourd'hui
+            let todayStr = new Date().toDateString();
             let todayMs = 0;
             this._myLocsRaw.forEach(l => {
                 let s = new Date(l.begin_at);
-                if (s.toDateString() === today) {
+                if (s.toDateString() === todayStr) {
                     let e = l.end_at ? new Date(l.end_at) : new Date();
                     todayMs += (e - s);
                 }
@@ -172,6 +180,9 @@ class DashboardIndicator extends PanelMenu.Button {
             let th = Math.floor(todayMs/3600000);
             let tm = Math.floor((todayMs%3600000)/60000);
             this.todayLbl.set_text(`${th}h${tm.toString().padStart(2,'0')}`);
+
+            // Mise à jour des labels (Top Bar + Target Daily)
+            this._updateTimeLabel();
         }
 
         let myStats = await this._fetchJsonPromise(`https://api.intra.42.fr/v2/users/${username}`, token);
@@ -184,6 +195,68 @@ class DashboardIndicator extends PanelMenu.Button {
             await this._updateFriendsList(token);
         }
     }
+
+    _updateTimeLabel() {
+        // 1. Calcul du total fait
+        let h = Math.floor(this._currentLogtimeMs/3600000);
+        let m = Math.floor((this._currentLogtimeMs%3600000)/60000);
+        
+        // 2. Calcul de l'objectif mensuel
+        let giftDays = this._settings.get_int('gift-days');
+        let targetHours = Math.max(0, 154 - (giftDays * 7)); // 154h approx pour le mois complet
+        
+        this.buttonLabel.set_text(`${h}h ${m}m / ${targetHours}h`);
+        this.timeDisplay.set_text(`Logtime ${h}h ${m}m`);
+
+        // 3. Calcul de la moyenne par jour restant
+        this._calculateDailyTarget(targetHours, this._currentLogtimeMs);
+    }
+
+    _calculateDailyTarget(targetHours, currentMs) {
+        let currentHours = currentMs / 3600000.0;
+        let remainingHours = targetHours - currentHours;
+
+        if (remainingHours <= 0) {
+            this.targetDailyLbl.set_text("Fini!");
+            this.targetDailyLbl.style = "color: #2ed573;"; // Vert
+            return;
+        }
+
+        let now = new Date();
+        // Fin du mois
+        let endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+        let todayDate = now.getDate();
+        let lastDate = endOfMonth.getDate();
+
+        let workableDaysCount = 0;
+
+        // On itère de "Aujourd'hui" jusqu'à la fin du mois
+        for (let d = todayDate; d <= lastDate; d++) {
+            let tempDate = new Date(now.getFullYear(), now.getMonth(), d);
+            let dayIndex = tempDate.getDay(); // 0 = Dimanche, 1 = Lundi...
+            
+            // On vérifie si l'utilisateur a activé ce jour dans les prefs
+            let isWorkingDay = this._settings.get_boolean(`day-${dayIndex}`);
+            if (isWorkingDay) {
+                workableDaysCount++;
+            }
+        }
+
+        if (workableDaysCount === 0) {
+            // Aucun jour dispo sélectionné
+            this.targetDailyLbl.set_text("∞");
+            return;
+        }
+
+        let dailyAvg = remainingHours / workableDaysCount;
+        let dh = Math.floor(dailyAvg);
+        let dm = Math.floor((dailyAvg - dh) * 60);
+
+        this.targetDailyLbl.set_text(`${dh}h${dm.toString().padStart(2,'0')}`);
+        this.targetDailyLbl.style = ""; // Reset style
+    }
+
+    // ... (Le reste des méthodes: _processHistory, _showFriendsView, _updateFriendsList, etc. restent identiques)
 
     _processHistory(locations, title) {
         if (!Array.isArray(locations)) locations = [];
@@ -245,18 +318,6 @@ class DashboardIndicator extends PanelMenu.Button {
         this.friendsBox.show();
         this.titleLbl.set_text("FRIENDS STATUS");
         this.backBtn.hide();
-    }
-
-    _updateTimeLabel() {
-        if (this._currentLogtimeMs === 0) return;
-        let h = Math.floor(this._currentLogtimeMs/3600000);
-        let m = Math.floor((this._currentLogtimeMs%3600000)/60000);
-        let giftDays = this._settings.get_int('gift-days');
-        let target = Math.max(0, 154 - (giftDays * 7));
-        
-        // MODIFICATION ICI : Ajout du texte "Logtime" devant
-        this.buttonLabel.set_text(`${h}h ${m}m / ${target}h`);
-        this.timeDisplay.set_text(`Logtime ${h}h ${m}m`);
     }
 
     async _updateFriendsList(token) {

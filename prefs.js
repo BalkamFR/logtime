@@ -1,4 +1,4 @@
-const { Adw, Gtk } = imports.gi;
+const { Adw, Gtk, Gio } = imports.gi; 
 const ExtensionUtils = imports.misc.extensionUtils;
 
 function init() {}
@@ -51,6 +51,23 @@ function fillPreferencesWindow(window) {
     giftRow.add_suffix(spinButton);
     groupConfig.add(giftRow);
 
+    // --- GROUPE PLANNING ---
+    const groupPlanning = new Adw.PreferencesGroup({ title: 'Mon Planning Type' });
+    page.add(groupPlanning);
+
+    const daysNames = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
+    
+    // On crée une ligne pour chaque jour
+    daysNames.forEach((dayName, index) => {
+        const dayRow = new Adw.ActionRow({ title: dayName });
+        const toggle = new Gtk.Switch({ valign: Gtk.Align.CENTER });
+        
+        // Bind settings: day-0, day-1, etc.
+        settings.bind(`day-${index}`, toggle, 'active', Gio.SettingsBindFlags.DEFAULT);
+        
+        dayRow.add_suffix(toggle);
+        groupPlanning.add(dayRow);
+    });
 
     // --- GROUPE 2 : GESTION AMIS ---
     const groupAdd = new Adw.PreferencesGroup({ title: 'Gestion des Amis' });
