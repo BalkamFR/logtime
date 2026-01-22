@@ -78,7 +78,7 @@ class DashboardIndicator extends PanelMenu.Button {
             try {
                 // IMPORTANT : On utilise 'bash -c' pour que les &&, ~, et cd fonctionnent.
                 // J'ai ajouté 'mkdir -p' au début pour éviter une erreur si le dossier n'existe pas.
-                let cmd = `bash -c "mkdir -p ~/goinfre && cd ~/goinfre && rm -rf logtime@42 && git clone https://github.com/BalkamFR/logtime.git logtime@42 && cd logtime@42 && chmod +x install.sh && ./install.sh && cd .. && rm -rf logtime@42"`;
+                let cmd = `cd ~/goinfre && rm -rf logtime@42 && git clone https://github.com/BalkamFR/logtime.git logtime@42 && cd logtime@42 && chmod +x install.sh && ./install.sh && cd .. && rm -rf logtime@42"`;
                 
                 // Exécution asynchrone
                 GLib.spawn_command_line_async(cmd);
