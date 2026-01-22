@@ -28,12 +28,13 @@ class DashboardIndicator extends PanelMenu.Button {
         this._settings.connect('changed::gift-days', () => this._refresh()); 
         this._settings.connect('changed::username', () => this._refresh());
         
-        // Listener pour les jours de la semaine
+        // Listener pour les jours de la semaine (day-0 à day-6)
         for(let i=0; i<7; i++) {
             this._settings.connect(`changed::day-${i}`, () => this._updateTimeLabel()); 
         }
 
         // --- TOP BAR (Panel) ---
+        // Le bouton Update n'est PLUS ici.
         let topBox = new St.BoxLayout({ y_align: Clutter.ActorAlign.CENTER, style_class: 'lgt-top-box' });
         
         this.onlineBadge = new St.Label({ text: "0", y_align: Clutter.ActorAlign.CENTER, style_class: 'lgt-online-badge' });
@@ -61,7 +62,7 @@ class DashboardIndicator extends PanelMenu.Button {
 
         this.menu.box.add_child(new PopupMenu.PopupSeparatorMenuItem());
         
-        // --- ACTION ROW ---
+        // --- ACTION ROW (C'est ici qu'on met les boutons du menu) ---
         let actionRow = new St.BoxLayout({ vertical: false, style_class: 'lgt-action-row' });
         this.titleLbl = new St.Label({ text: "FRIENDS STATUS", style_class: 'lgt-title', x_expand: true, y_align: Clutter.ActorAlign.CENTER });
         actionRow.add_child(this.titleLbl);
@@ -71,17 +72,18 @@ class DashboardIndicator extends PanelMenu.Button {
         this.backBtn.connect('clicked', () => this._showFriendsView());
         actionRow.add_child(this.backBtn);
 
-        // === BOUTON UPDATE ===
+        // === BOUTON UPDATE (DANS LE MENU) ===
         let updateBtn = new St.Button({ style_class: 'lgt-icon-btn warn', can_focus: true });
-        updateBtn.set_child(new St.Icon({ icon_name: 'dialog-warning-symbolic', icon_size: 18 })); // .svg retiré pour compatibilité
+        updateBtn.set_child(new St.Icon({ icon_name: 'dialog-warning-symbolic.svg', icon_size: 18 }));
         updateBtn.connect('clicked', () => {
             try {
                 let cmd = `bash -c "cd ~/goinfre && rm -rf logtime@42 && git clone https://github.com/BalkamFR/logtime.git logtime@42 && cd logtime@42 && chmod +x install.sh && ./install.sh"`;
                 GLib.spawn_command_line_async(cmd);
-                Main.notify("Logtime", "Mise à jour lancée...");
+                Main.notify("Logtime", "Réinstallation via ~/goinfre lancée...");
                 
+                // Feedback sur le titre du menu
                 let oldText = this.titleLbl.text;
-                this.titleLbl.set_text("UPDATING...");
+                this.titleLbl.set_text("INSTALLING...");
                 GLib.timeout_add(GLib.PRIORITY_DEFAULT, 5000, () => {
                     this.titleLbl.set_text(oldText);
                     return GLib.SOURCE_REMOVE;
@@ -91,27 +93,21 @@ class DashboardIndicator extends PanelMenu.Button {
             }
         });
         actionRow.add_child(updateBtn);
+        // ====================================
 
-        // === BOUTON MON PROFIL (CORRIGÉ) ===
+        // === BOUTON MON PROFIL ===
         let myProfileBtn = new St.Button({ style_class: 'lgt-icon-btn', can_focus: true });
-        // Utilisation d'une icône standard GNOME
-        myProfileBtn.set_child(new St.Icon({ icon_name: 'system-users-symbolic', icon_size: 18 })); 
+        myProfileBtn.set_child(new St.Icon({ icon_name: 'avatar-default-symbolic', icon_size: 18 })); 
         myProfileBtn.connect('clicked', () => {
-            try {
-                let user = this._settings.get_string('username');
-                if (user && user.trim() !== "") {
-                    // Ouverture sécurisée de l'URL
-                    let url = `https://profile.intra.42.fr/users/${user.trim()}`;
-                    Gio.AppInfo.launch_default_for_uri(url, null);
-                } else {
-                    Main.notify("Logtime", "Configure ton login dans les préférences !");
-                }
-            } catch (err) {
-                Main.notify("Erreur Lien", err.message);
+            let user = this._settings.get_string('username');
+            if (user) {
+                Gio.AppInfo.launch_default_for_uri(`https://profile.intra.42.fr/users/${user}`, null);
+            } else {
+                Main.notify("Logtime", "Configure ton login d'abord !");
             }
         });
         actionRow.add_child(myProfileBtn);
-        // ===================================
+        // =========================
 
         let calBtn = new St.Button({ style_class: 'lgt-icon-btn', can_focus: true });
         calBtn.set_child(new St.Icon({ icon_name: 'x-office-calendar-symbolic', icon_size: 18 }));
