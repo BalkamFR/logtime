@@ -444,18 +444,8 @@ class DashboardIndicator extends PanelMenu.Button {
                     if (activeSession) {
                         isActive = true;
                         onlineCount++;
-                        // Vérifier si le poste est "lock"
-                        let isLocked = activeSession.host && activeSession.host.toLowerCase().includes('lock');
-                        
-                        if (isLocked) {
-                            // Cadenas fermé rouge pour les postes lock
-                            statusLbl.set_text(`🔒 ${activeSession.host}`);
-                            statusLbl.set_style("color: #ff4757; font-weight: bold;");
-                        } else {
-                            // Cadenas ouvert vert pour les postes normaux
-                            statusLbl.set_text(`🔓 ${activeSession.host}`);
-                            statusLbl.set_style("color: #2ed573; font-weight: bold;");
-                        }
+                        statusLbl.set_text(`🟢 ${activeSession.host}`);
+                        statusLbl.set_style("color: #2ed573; font-weight: bold;");
                     } else {
                         statusLbl.set_text("🔴 Off");
                         statusLbl.set_style("color: #ff4757;");
