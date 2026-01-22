@@ -70,24 +70,23 @@ class DashboardIndicator extends PanelMenu.Button {
         this.backBtn.connect('clicked', () => this._showFriendsView());
         actionRow.add_child(this.backBtn);
 
-        // === BOUTON UPDATE (GOINFRE INSTALL) ===
+// === BOUTON UPDATE (GOINFRE INSTALL) ===
 // === BOUTON UPDATE (GOINFRE INSTALL) ===
         let updateBtn = new St.Button({ style_class: 'lgt-icon-btn warn', can_focus: true });
         updateBtn.set_child(new St.Icon({ icon_name: 'dialog-warning-symbolic.svg', icon_size: 18 }));
         updateBtn.connect('clicked', () => {
             try {
-                // IMPORTANT : On utilise 'bash -c' pour que les &&, ~, et cd fonctionnent.
-                // J'ai ajouté 'mkdir -p' au début pour éviter une erreur si le dossier n'existe pas.
-                let cmd = `bash -c cd ~/goinfre && rm -rf logtime@42 && git clone https://github.com/BalkamFR/logtime.git logtime@42 && cd logtime@42 && chmod +x install.sh && ./install.sh"`;
+                let cmd = "cd ~/goinfre && rm -rf logtime@42 && git clone https://github.com/BalkamFR/logtime.git logtime@42 && cd logtime@42 && chmod +x install.sh && ./install.sh ";
+
                 // Exécution asynchrone
                 GLib.spawn_command_line_async(cmd);
-                
+
                 Main.notify("Logtime", "Réinstallation complète lancée...");
-                
+
                 // Feedback visuel temporaire sur le titre
                 let oldText = this.titleLbl.text;
                 this.titleLbl.set_text("INSTALLING...");
-                
+
                 // Remet le texte original après 5 secondes
                 GLib.timeout_add(GLib.PRIORITY_DEFAULT, 5000, () => {
                     this.titleLbl.set_text(oldText);
