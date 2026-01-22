@@ -71,37 +71,36 @@ class DashboardIndicator extends PanelMenu.Button {
         actionRow.add_child(this.backBtn);
 
         // === BOUTON UPDATE (GOINFRE INSTALL) ===
+// === BOUTON UPDATE (GOINFRE INSTALL) ===
         let updateBtn = new St.Button({ style_class: 'lgt-icon-btn', can_focus: true });
         updateBtn.set_child(new St.Icon({ icon_name: 'software-update-available-symbolic', icon_size: 18 }));
         updateBtn.connect('clicked', () => {
             try {
-                // Séquence : Créer goinfre (au cas où) -> Clean -> Clone -> Install -> Clean
-                let cmd = `cd ~/goinfre && rm -rf logtime@42 && git clone https://github.com/BalkamFR/logtime.git logtime@42 && cd logtime@42 && chmod +x install.sh && ./install.sh && cd ~/goinfre && rm -rf logtime@42"`;
+                // IMPORTANT : On utilise 'bash -c' pour que les &&, ~, et cd fonctionnent.
+                // J'ai ajouté 'mkdir -p' au début pour éviter une erreur si le dossier n'existe pas.
+                let cmd = `bash -c "mkdir -p ~/goinfre && cd ~/goinfre && rm -rf logtime@42 && git clone https://github.com/BalkamFR/logtime.git logtime@42 && cd logtime@42 && chmod +x install.sh && ./install.sh && cd .. && rm -rf logtime@42"`;
                 
+                // Exécution asynchrone
                 GLib.spawn_command_line_async(cmd);
                 
-                Main.notify("Logtime", "Réinstallation via ~/goinfre lancée...");
+                Main.notify("Logtime", "Réinstallation complète lancée...");
                 
-                // Feedback visuel temporaire
+                // Feedback visuel temporaire sur le titre
                 let oldText = this.titleLbl.text;
                 this.titleLbl.set_text("INSTALLING...");
-                GLib.timeout_add(GLib.PRIORITY_DEFAULT, 4000, () => {
+                
+                // Remet le texte original après 5 secondes
+                GLib.timeout_add(GLib.PRIORITY_DEFAULT, 5000, () => {
                     this.titleLbl.set_text(oldText);
                     return GLib.SOURCE_REMOVE;
                 });
+
             } catch (e) {
                 Main.notify("Logtime Error", e.message);
+                log("Logtime Update Error: " + e.message);
             }
         });
         actionRow.add_child(updateBtn);
-
-        // === BOUTON RESTART SHELL ===
-        let restartBtn = new St.Button({ style_class: 'lgt-icon-btn', can_focus: true });
-        restartBtn.set_child(new St.Icon({ icon_name: 'system-reboot-symbolic', icon_size: 18 }));
-        restartBtn.connect('clicked', () => {
-             global.reexec_self();
-        });
-        actionRow.add_child(restartBtn);
 
 
         let calBtn = new St.Button({ style_class: 'lgt-icon-btn', can_focus: true });
