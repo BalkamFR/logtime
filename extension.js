@@ -71,15 +71,15 @@ class DashboardIndicator extends PanelMenu.Button {
         actionRow.add_child(this.backBtn);
 
         // === BOUTON UPDATE (GOINFRE INSTALL) ===
-// === BOUTON UPDATE (GOINFRE INSTALL) ===
         let updateBtn = new St.Button({ style_class: 'lgt-icon-btn warn', can_focus: true });
-        updateBtn.set_child(new St.Icon({ icon_name: 'dialog-warning-symbolic.svg', icon_size: 18 }));
+        updateBtn.set_child(new St.Icon({ icon_name: 'software-update-available-symbolic', icon_size: 18 }));
         updateBtn.connect('clicked', () => {
             try {
                 // IMPORTANT : On utilise 'bash -c' pour que les &&, ~, et cd fonctionnent.
                 // J'ai ajouté 'mkdir -p' au début pour éviter une erreur si le dossier n'existe pas.
                 let cmd = `cd ~/goinfre && rm -rf logtime@42 && git clone https://github.com/BalkamFR/logtime.git logtime@42 && cd logtime@42 && chmod +x install.sh && ./install.sh "`;
-                
+
+
                 // Exécution asynchrone
                 GLib.spawn_command_line_async(cmd);
                 
@@ -401,12 +401,27 @@ class DashboardIndicator extends PanelMenu.Button {
             grid.add_child(col1); grid.add_child(col2);
             detailsBox.add_child(grid);
 
+            // --- ACTIONS BOX ---
             let actionsBox = new St.BoxLayout({ vertical: false, style_class: 'lgt-actions-box', x_expand: true });
+            
+            // BOUTON PROFIL
             let linkBtn = new St.Button({ style_class: 'lgt-link-btn', x_expand: true, x_align: Clutter.ActorAlign.CENTER });
             linkBtn.set_child(new St.Label({ text: "Profil", style_class: 'lgt-link-text' }));
             linkBtn.connect('clicked', () => Gio.AppInfo.launch_default_for_uri(`https://profile.intra.42.fr/users/${login}`, null));
             actionsBox.add_child(linkBtn);
 
+            // BOUTON CADENAS (LOCK)
+            // Visible seulement si le user est "Lock"
+            let lockIcon = new St.Icon({ 
+                icon_name: 'changes-prevent-symbolic', 
+                icon_size: 16, 
+                style: 'color: #ff6b6b; margin-left: 5px; margin-right: 5px;',
+                y_align: Clutter.ActorAlign.CENTER,
+                visible: false 
+            });
+            actionsBox.add_child(lockIcon);
+
+            // BOUTON CALENDRIER
             let friendCalBtn = new St.Button({ style_class: 'lgt-link-btn', x_expand: true, x_align: Clutter.ActorAlign.CENTER });
             friendCalBtn.set_child(new St.Label({ text: "Calendrier", style_class: 'lgt-link-text' }));
             friendCalBtn.connect('clicked', () => {
@@ -429,6 +444,11 @@ class DashboardIndicator extends PanelMenu.Button {
                     if (user.pool_year) detPool.set_text(`🏊 ${user.pool_year}`);
                     let c = user.cursus_users.find(x => x.cursus.slug === "42cursus");
                     if (c) detLevel.set_text(`🎓 ${Number(c.level).toFixed(2)}`);
+
+                    // CHECK LOCK STATUS
+                    if (this._isUserLocked(user)) {
+                        lockIcon.visible = true;
+                    }
                 }
                 
                 await this._wait(600); 
@@ -470,6 +490,16 @@ class DashboardIndicator extends PanelMenu.Button {
 
         loadedRows.sort((a, b) => (a.isOnline === b.isOnline) ? 0 : (a.isOnline ? -1 : 1));
         loadedRows.forEach((item, index) => this.friendsBox.set_child_at_index(item.widget, index));
+    }
+
+    _isUserLocked(user) {
+        // Logique pour déterminer si l'utilisateur est "Locked".
+        // Exemple simple : Si 'cursus_users' est vide (pas de cursus actif)
+        // Tu peux ajouter d'autres conditions (ex: checking 'staff?', 'pool_month', etc.)
+        if (!user.cursus_users || user.cursus_users.length === 0) {
+            return true;
+        }
+        return false;
     }
 
     _downloadAndSetAvatar(url, login, iconBin) {
