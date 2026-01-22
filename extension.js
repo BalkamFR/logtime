@@ -383,6 +383,13 @@ class DashboardIndicator extends PanelMenu.Button {
 
             let statusLbl = new St.Label({ text: "⚫", style_class: 'lgt-friend-status', y_align: Clutter.ActorAlign.CENTER });
             row.add_child(statusLbl);
+
+            // --- AJOUT CADENAS ---
+            let lockIcon = new St.Icon({ icon_name: 'changes-allow-symbolic', icon_size: 16 });
+            lockIcon.hide();
+            row.add_child(lockIcon);
+            // ---------------------
+
             headerBtn.set_child(row);
             mainContainer.add_child(headerBtn);
 
@@ -446,9 +453,27 @@ class DashboardIndicator extends PanelMenu.Button {
                         onlineCount++;
                         statusLbl.set_text(`🟢 ${activeSession.host}`);
                         statusLbl.set_style("color: #2ed573; font-weight: bold;");
+
+                        // --- GESTION ETAT CADENAS ---
+                        lockIcon.show();
+                        
+                        // L'API ne donne pas le lock status par défaut. 
+                        // On assume "déverrouillé" si connecté.
+                        let isLocked = false; 
+
+                        if (isLocked) {
+                            lockIcon.set_icon_name('system-lock-screen-symbolic'); // Cadenas fermé
+                            lockIcon.style = "color: #ff4757; margin-left: 8px;"; // Rouge
+                        } else {
+                            lockIcon.set_icon_name('changes-allow-symbolic'); // Cadenas ouvert
+                            lockIcon.style = "color: #2ed573; margin-left: 8px;"; // Vert
+                        }
+                        // ----------------------------
+
                     } else {
                         statusLbl.set_text("🔴 Off");
                         statusLbl.set_style("color: #ff4757;");
+                        lockIcon.hide();
                     }
                 }
             } catch (err) {
